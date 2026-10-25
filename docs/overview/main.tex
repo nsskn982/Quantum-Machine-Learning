@@ -1,0 +1,577 @@
+% ---------------------------------------------------------------------------
+%  The Four Quadrants of Quantum Machine Learning
+%  Build:  latexmk -pdf main.tex      (or pdflatex, bibtex, pdflatex, pdflatex)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{qmlproject}
+\qmlheader{The four quadrants of QML}
+
+\title{\textbf{The Four Quadrants of Quantum Machine Learning}\\[0.4em]
+  \large Concepts, methods, and where the QML Lab project fits}
+\author{QML Lab project notes}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Quantum machine learning (QML) is not one field but four. A common taxonomy sorts work by two
+questions: is the data (or the system being studied) classical or quantum, and is the computer that
+learns from it classical or quantum? The answers give four quadrants, \CC, \CQ, \QC\ and \QQ. This
+document explains each quadrant and the main concepts inside it, with the key equations and
+references, and then maps the modules and research projects of the QML Lab onto the quadrants. Most
+of the project lives in \CQ, the quadrant served by PennyLane and Qiskit; the open-ended projects
+reach into \QC\ and \QQ, where the strongest current results and the clearest arguments for quantum
+advantage are found.
+\end{abstract}
+
+\tableofcontents
+\bigskip
+
+% ===========================================================================
+\section{Why a taxonomy?}
+% ===========================================================================
+
+``Quantum machine learning'' is used for very different activities: running a neural network on a
+quantum computer, using a neural network to read out a quantum experiment, borrowing quantum
+mathematics for classical algorithms, or learning directly from quantum states. These activities need
+different hardware, rest on different assumptions and make different claims about speed-ups. Lumping
+them together causes most of the confusion in the field.
+
+The taxonomy used here goes back to A\"imeur, Brassard and Gambs \citeyearpar{aimeur2006}, who distinguished
+learning settings by whether the learner and the learning task are classical or quantum. It was used
+in the now-familiar $2\times2$ form by Dunjko, Taylor and Briegel \citeyearpar{dunjko2016,dunjko2018} and
+popularised in the textbook of Schuld and Petruccione \citeyearpar{schuld2018,schuld2021book}. Broad reviews
+of the field are refs. \citep{biamonte2017,dunjko2018,cerezo2021vqa}.
+
+\begin{inshort}
+Each label has two letters. The \emph{first} letter says what kind of data or system is being
+studied; the \emph{second} says what kind of computer processes it. \CQ\ therefore means
+\emph{classical data, quantum processor}.
+\end{inshort}
+
+% ===========================================================================
+\section{Preliminaries: quantum states, measurement and ``quantum data''}
+\label{sec:prelim}
+% ===========================================================================
+
+\paragraph{Qubits and states.}
+A qubit is a unit vector in $\mathbb{C}^2$, $\ket{\psi}=a\ket{0}+b\ket{1}$ with $|a|^2+|b|^2=1$.
+A register of $n$ qubits lives in a $2^n$-dimensional Hilbert space. This exponential size is the
+source of both the hopes for QML (large feature spaces) and many of its difficulties (data loading,
+vanishing gradients). Mixed states, which describe noise or partial knowledge, are written as density
+matrices $\rho$ with $\rho\succeq0$ and $\Tr\rho=1$.
+
+\paragraph{Measurement.}
+Measuring $\ket{\psi}$ in the computational basis returns outcome $i$ with probability
+$p(i)=|\braket{i|\psi}|^2$ (the Born rule), and the state collapses. What a quantum model outputs in
+practice is an \emph{expectation value} of an observable $O$,
+\begin{equation}
+  \langle O\rangle_\rho=\Tr(O\rho),
+\end{equation}
+estimated from $M$ repeated measurements (\emph{shots}) with statistical error of order
+$1/\sqrt{M}$. Every quantum model therefore pays a sampling cost that classical models do not.
+
+\paragraph{Why measurement matters for learning.}
+A measurement extracts at most $n$ classical bits from $n$ qubits and destroys the superposition.
+Information that lives in phases and correlations of the state, which is most of it, is lost unless
+the measurement is chosen with the question already in mind. This single fact explains why the
+\QC/\QQ\ distinction matters (\cref{sec:qq}).
+
+\paragraph{Quantum data.}
+``Quantum data'' means data that \emph{is} a quantum state or process: the output of a quantum
+simulation, the state stored in a quantum sensor or memory, or a state arriving over a quantum
+network. It is different from classical data that happens to describe a quantum system (a table of
+measurement outcomes is classical data).
+
+% ===========================================================================
+\section{The taxonomy at a glance}
+% ===========================================================================
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  cell/.style={draw=#1,line width=1pt,fill=#1!7,minimum width=6.4cm,minimum height=3.6cm,
+               align=flush left,text width=6cm,inner sep=6pt,rounded corners=3pt},
+  head/.style={font=\bfseries\small,align=center}]
+  \node[cell=ccC] (cc) at (0,0) {{\Large\CC}\\[2pt] \textbf{Classical data, classical computer}\\[4pt]
+     \small Quantum-inspired algorithms\\ Tensor networks\\ Dequantisation};
+  \node[cell=cqC] (cq) at (6.8,0) {{\Large\CQ}\\[2pt] \textbf{Classical data, quantum computer}\\[4pt]
+     \small Variational circuits, quantum kernels\\ HHL, quantum PCA\\ \textit{Core of the QML Lab}};
+  \node[cell=qcC] (qc) at (0,-3.9) {{\Large\QC}\\[2pt] \textbf{Quantum data, classical computer}\\[4pt]
+     \small Phase classification\\ Neural tomography, classical shadows\\ QEC decoders, calibration, control};
+  \node[cell=qqC] (qq) at (6.8,-3.9) {{\Large\QQ}\\[2pt] \textbf{Quantum data, quantum computer}\\[4pt]
+     \small Quantum convolutional networks\\ Learning with quantum memory\\ Quantum metrology};
+  \node[head] at (0,2.2) {Classical processor};
+  \node[head] at (6.8,2.2) {Quantum processor};
+  \node[head,rotate=90] at (-3.75,0) {Classical data};
+  \node[head,rotate=90] at (-3.75,-3.9) {Quantum data};
+\end{tikzpicture}
+\caption{The four quadrants of quantum machine learning. Rows: what is being learned about.
+Columns: what does the computing.}
+\label{fig:quadrants}
+\end{figure}
+
+The two axes separate two questions that are often blurred: \emph{what are we learning about?}
+and \emph{what are we computing with?} \Cref{tab:summary} summarises the quadrants; the following
+sections explain each.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ & Typical question & Needs quantum hardware? & Status of advantage claims \\
+\midrule
+\CC & Can quantum ideas improve classical algorithms? & No & Some proposed quantum speed-ups were matched classically \\
+\CQ & Can a quantum computer learn better from ordinary data? & Yes (NISQ or fault-tolerant) & Debated; data loading and trainability are open problems \\
+\QC & Can classical ML help us understand or control quantum systems? & Only as the data source & Already useful in practice \\
+\QQ & Can a quantum computer learn directly from quantum states? & Yes, plus a quantum data source & Strongest theoretical case; proven separations exist \\
+\bottomrule
+\end{tabularx}
+\caption{Summary of the four quadrants.}
+\label{tab:summary}
+\end{table}
+
+% ===========================================================================
+\section{CC: classical data, classical processing}
+\label{sec:cc}
+% ===========================================================================
+
+At first sight \CC\ is just ordinary machine learning. It belongs in the scheme because of
+\emph{quantum-inspired} methods: classical algorithms that borrow mathematics or ideas from quantum
+physics. It also serves a second role: \CC\ is the baseline every quantum claim must beat.
+
+\subsection{Tensor networks}
+Tensor networks were developed to represent many-body quantum states compactly \citep{orus2019}. A
+state of $N$ particles has $d^N$ amplitudes, but physically relevant states often have limited
+entanglement and can be written as a chain of small tensors, a \emph{matrix product state} (MPS),
+whose size grows only linearly in $N$.
+
+Stoudenmire and Schwab \citeyearpar{stoudenmire2016} applied the same structure to classification. Each
+input feature $x_j\in[0,1]$ is mapped to a two-component vector, and the features are combined with a
+tensor product:
+\begin{equation}
+  \phi(x_j)=\begin{pmatrix}\cos\frac{\pi}{2}x_j\\[2pt] \sin\frac{\pi}{2}x_j\end{pmatrix},\qquad
+  \Phi(x)=\phi(x_1)\otimes\phi(x_2)\otimes\cdots\otimes\phi(x_N),\qquad
+  f^{\ell}(x)=W^{\ell}\cdot\Phi(x).
+\end{equation}
+$\Phi(x)$ lives in a $2^N$-dimensional space, like an $N$-qubit product state. The weight tensor
+$W^\ell$ for class $\ell$ is stored as an MPS with bond dimension $\chi$, so evaluation and training
+cost grows only linearly in $N$ and polynomially in $\chi$. The bond dimension controls how much
+``entanglement'', that is how many feature correlations, the model can represent.
+
+\subsection{Dequantisation}
+Several early \CQ\ algorithms promised exponential speed-ups for linear-algebra tasks. Kerenidis and
+Prakash \citeyearpar{kerenidis2017} proposed a quantum recommendation system whose running time is
+polylogarithmic in the size of the preference matrix. Its input model assumes the data can be
+prepared as quantum states efficiently, for example from a quantum random access memory
+(QRAM) \citep{giovannetti2008qram}.
+
+Tang \citeyearpar{tang2019} showed that a \emph{classical} algorithm given the analogous access, namely the
+ability to sample rows and entries with probability proportional to their squared norm
+(\emph{$\ell_2$-norm sampling}), can also produce recommendations in time polylogarithmic in the
+matrix dimensions, for low-rank matrices. The exponential gap disappears once both sides get the
+same input assumptions. Chia et~al. \citeyearpar{chia2022} turned this into a general framework that
+dequantises a broad class of low-rank quantum linear-algebra algorithms.
+
+\subsection{Why CC matters for the rest}
+\begin{itemize}
+  \item Speed-up claims are only meaningful against the \emph{best} classical method with the
+        \emph{same} access to the data. Dequantisation is the clearest example.
+  \item Every \CQ\ experiment needs a \CC\ baseline with a comparable number of parameters,
+        tuned with equal care \citep{bowles2024}.
+\end{itemize}
+
+\begin{inshort}
+\CC\ is classical computing with quantum mathematics. Tensor networks give compact models;
+dequantisation shows that some promised quantum speed-ups came from input assumptions rather than
+from quantum mechanics.
+\end{inshort}
+
+% ===========================================================================
+\section{CQ: classical data, quantum processing}
+\label{sec:cq}
+% ===========================================================================
+
+This is what most people mean by quantum machine learning and what most PennyLane and Qiskit
+tutorials teach: classical data (images, tables, time series) is encoded into qubits and processed
+by a quantum circuit. A \CQ\ model has three stages,
+\[
+  x\ \xrightarrow{\ \text{encode}\ }\ \ket{\psi(x)}\ \xrightarrow{\ \text{process}\ }\
+  U(\theta)\ket{\psi(x)}\ \xrightarrow{\ \text{measure}\ }\ \langle O\rangle ,
+\]
+and usually a classical optimiser that adjusts $\theta$.
+
+\subsection{Data encoding (feature maps)}
+\label{sec:encoding}
+The \emph{feature map} $x\mapsto\ket{\psi(x)}$ decides what the model can learn, because the
+trainable part can only separate what the encoding has already pulled apart \citep{schuld2019feature}.
+Common choices:
+
+\begin{description}[style=nextline,leftmargin=1.2em]
+  \item[Basis encoding] A bit string $x\in\{0,1\}^n$ becomes the basis state $\ket{x}$. Natural for
+        binary data; one qubit per bit.
+  \item[Angle encoding] Each feature is a rotation angle,
+        $\ket{\psi(x)}=\bigotimes_{j=1}^{n}R_Y(x_j)\ket{0}$. One qubit per feature, cheap to prepare,
+        but a product state with no entanglement between features.
+  \item[Amplitude encoding] A normalised vector becomes the amplitudes,
+        \begin{equation}
+          \ket{\psi(x)}=\frac{1}{\lVert x\rVert}\sum_{i=1}^{N}x_i\ket{i},
+        \end{equation}
+        using only $\lceil\log_2N\rceil$ qubits. Very compact, but preparing a general state needs
+        circuits of size $O(N)$, and the norm $\lVert x\rVert$ is lost.
+  \item[IQP / ZZ feature maps] Hadamards followed by diagonal gates whose phases depend on
+        single features and on products of features \citep{havlicek2019}:
+        \begin{equation}
+          U_{\Phi}(x)=\exp\!\Big(i\sum_{S}\phi_S(x)\prod_{j\in S}Z_j\Big)H^{\otimes n},\qquad
+          \phi_{\{i\}}(x)=x_i,\quad \phi_{\{i,j\}}(x)=(\pi-x_i)(\pi-x_j),
+        \end{equation}
+        usually applied more than once. These states are believed to be hard to simulate
+        classically, which is what makes the corresponding kernel (\cref{sec:kernels}) interesting.
+\end{description}
+
+\subsection{The data-loading problem}
+\label{sec:loading}
+Many theoretical \CQ\ speed-ups assume that a data vector can be turned into a quantum state in time
+polylogarithmic in its length. For arbitrary classical data that needs a QRAM \citep{giovannetti2008qram},
+which does not exist at scale, or a state-preparation circuit whose cost can be linear in the data
+size and cancel the speed-up. Aaronson \citeyearpar{aaronson2015} lists this as the first item of ``fine
+print'' to check in any quantum learning claim, together with the condition number of the problem,
+the fact that the output is a quantum state rather than a list of numbers, and comparison with the
+best classical algorithm.
+
+\subsection{Variational quantum circuits}
+A variational quantum circuit (also called a parameterised quantum circuit or quantum neural
+network) defines the model
+\begin{equation}
+  f_\theta(x)=\braket{\psi(x)|U(\theta)^\dagger\,O\,U(\theta)|\psi(x)},
+  \label{eq:vqc}
+\end{equation}
+where $U(\theta)$ is a sequence of parameterised rotations and entangling gates (the
+\emph{ansatz}) and $O$ an observable such as $Z$ on the first qubit \citep{mitarai2018,cerezo2021vqa}.
+For classification, the sign of $f_\theta(x)$ plus a bias gives the label. Training minimises a loss
+such as the mean squared error with a classical optimiser. Only the circuit evaluations run on
+quantum hardware, which makes these models suitable for noisy intermediate-scale quantum (NISQ)
+devices \citep{preskill2018}.
+
+\subsection{Gradients: the parameter-shift rule}
+Back-propagation is impossible on hardware, because intermediate states cannot be stored or copied.
+For gates of the form $e^{-i\theta P/2}$ with $P$ a Pauli operator, the exact derivative follows
+from two additional circuit runs \citep{mitarai2018,schuld2019gradients}:
+\begin{equation}
+  \frac{\partial f}{\partial\theta_k}
+  =\frac12\Big[f\big(\theta+\tfrac{\pi}{2}e_k\big)-f\big(\theta-\tfrac{\pi}{2}e_k\big)\Big].
+\end{equation}
+Unlike finite differences this is exact, and it works on hardware. Its cost is two circuit
+evaluations per parameter per step, each estimated from shots.
+
+\subsection{Expressivity and data re-uploading}
+If a feature enters the circuit through gates $e^{-ixG}$, the model is a truncated Fourier series
+in $x$ \citep{schuld2021fourier},
+\begin{equation}
+  f_\theta(x)=\sum_{\omega\in\Omega}c_\omega(\theta)\,e^{i\omega x},
+\end{equation}
+where the available frequencies $\Omega$ are set by the eigenvalues of the encoding generators.
+Encoding a feature once with a single Pauli rotation gives only frequencies $\{-1,0,1\}$: a single
+sine wave. \emph{Data re-uploading} \citep{perezsalinas2020}, encoding $x$ again before each trainable
+layer, enlarges the spectrum to $\{-L,\dots,L\}$ for $L$ repetitions. This is why even one or two
+qubits can learn curved decision boundaries when the data is re-uploaded.
+
+\subsection{Quantum kernel methods}
+\label{sec:kernels}
+A kernel method needs only a similarity measure between data points. A quantum kernel uses the
+overlap of encoded states \citep{havlicek2019,schuld2019feature}:
+\begin{equation}
+  \kappa(x,x')=|\braket{\psi(x)|\psi(x')}|^2=\Tr\!\big[\rho(x)\,\rho(x')\big].
+\end{equation}
+The quantum computer only estimates the Gram matrix $K_{ij}=\kappa(x_i,x_j)$, for example by running
+$U_\Phi(x')^\dagger U_\Phi(x)$ and counting how often all qubits return to $\ket{0\cdots0}$. A
+classical support vector machine then learns the decision function
+$f(x)=\operatorname{sign}\big(\sum_i\alpha_iy_i\,\kappa(x_i,x)+b\big)$. Training is a convex problem,
+so there are no barren plateaus in the optimisation itself. Variational models and kernel models are
+closely related: the model in \cref{eq:vqc} is a linear model in the feature space of density
+matrices \citep{schuld2021book}.
+
+The catch is \emph{exponential concentration} \citep{thanasilp2024}. For expressive feature maps on
+many qubits, the off-diagonal kernel values concentrate exponentially around a fixed value, so the
+Gram matrix approaches the identity and an exponential number of shots is needed to tell entries
+apart. The resulting model memorises the training data and generalises poorly. Huang
+et~al. \citeyearpar{huang2021power} add a second caution: given enough data, classical models can often
+match quantum kernels, and they give a test (the geometric difference between kernels) for when a
+quantum kernel can possibly help.
+
+\subsection{Quantum linear-algebra algorithms}
+A separate line of \CQ\ work speeds up the linear algebra underneath many learning algorithms. Such
+algorithms usually assume fault-tolerant hardware.
+\begin{itemize}
+  \item \textbf{HHL} \citep{harrow2009} prepares a state $\ket{x}\propto A^{-1}\ket{b}$ for a sparse,
+        well-conditioned $N\times N$ matrix $A$ in time $\tilde{O}(\log(N)\,s^2\kappa^2/\epsilon)$,
+        where $s$ is the sparsity and $\kappa$ the condition number. The output is a quantum state;
+        reading out all of $x$ would cost $O(N)$ again.
+  \item \textbf{Quantum PCA} \citep{lloyd2014qpca} uses copies of a density matrix $\rho$ to apply
+        $e^{-i\rho t}$ and phase estimation to reveal the largest eigenvalues and eigenvectors of
+        $\rho$ in time logarithmic in its dimension, for low-rank $\rho$.
+  \item \textbf{Quantum SVM} \citep{rebentrost2014} solves the least-squares SVM with these
+        primitives.
+\end{itemize}
+Each of these inherits the caveats of \cref{sec:loading}, and several low-rank variants have been
+dequantised (\cref{sec:cc}).
+
+\subsection{Trainability and noise}
+\begin{description}[style=nextline,leftmargin=1.2em]
+  \item[Barren plateaus] For deep, randomly initialised circuits the gradient of the cost averages to
+        zero, and its variance vanishes exponentially in the number of qubits
+        $n$ \citep{mcclean2018}: $\operatorname{Var}[\partial_kC]\in O(b^{-n})$ for some $b>1$. The
+        landscape is flat almost everywhere. Global cost functions (observables acting on all qubits)
+        suffer even for shallow circuits, while local costs on shallow circuits keep polynomially
+        large gradients \citep{cerezo2021cost}.
+  \item[Noise] Gate errors and decoherence shrink expectation values toward their maximally mixed
+        values, so deeper circuits carry less signal. On NISQ hardware, circuits must stay shallow.
+  \item[Shot noise] Every expectation value, gradient and kernel entry is estimated from finitely many
+        shots, so small signals cost many repetitions.
+\end{description}
+
+\begin{inshort}
+\CQ\ is the most explored quadrant and the one the QML Lab modules teach. Its tools are feature maps,
+variational circuits trained with the parameter-shift rule, and quantum kernels. Its open problems
+are data loading, barren plateaus, kernel concentration, noise, and showing an advantage over strong
+classical baselines.
+\end{inshort}
+
+% ===========================================================================
+\section{QC: quantum data, classical processing}
+\label{sec:qc}
+% ===========================================================================
+
+Here classical machine learning is the tool and quantum systems are the subject. The data comes from
+quantum experiments or simulations, but the learning runs on ordinary computers. This quadrant is
+already productive because it needs no fault-tolerant quantum computer \citep{gebhart2023}.
+
+\subsection{Classifying phases of matter}
+Carrasquilla and Melko \citeyearpar{carrasquilla2017} trained ordinary neural networks on spin
+configurations sampled from many-body models. The networks learned to distinguish ordered from
+disordered phases and located phase transitions without being told the order parameter. The input
+is measurement data, that is classical snapshots of quantum states, and the processor is classical.
+
+\subsection{Neural-network quantum states and tomography}
+A neural network can represent the wave function itself. Carleo and Troyer \citeyearpar{carleo2017} used a
+restricted Boltzmann machine,
+\begin{equation}
+  \psi_\theta(\sigma)=\sum_{\{h\}}\exp\Big(\sum_ja_j\sigma_j+\sum_ib_ih_i+\sum_{ij}W_{ij}h_i\sigma_j\Big),
+\end{equation}
+to find ground states of spin models variationally. Torlai et~al. \citeyearpar{torlai2018} turned this around
+for \emph{tomography}: training such a network on measurement outcomes reconstructs a many-body state
+from far fewer measurements than full tomography, whose cost grows exponentially with system size.
+
+\subsection{Classical shadows}
+Huang, Kueng and Preskill \citeyearpar{huang2020shadows} showed how to predict many properties of a state
+from few measurements. Each round applies a random unitary $U$ (for example random single-qubit Pauli
+bases), measures in the computational basis, and stores a classical ``snapshot'',
+\begin{equation}
+  \hat\rho=\bigotimes_{j=1}^{n}\big(3\,U_j^\dagger\ket{\hat b_j}\!\bra{\hat b_j}U_j-I\big).
+\end{equation}
+Averages of snapshots predict $M$ observables to accuracy $\epsilon$ with a number of measurements
+that grows only as $\log M$ (for local observables). The measurement is quantum, the learning is
+classical: a clean example of \QC, and a common input format for classical ML on quantum data.
+
+\subsection{Decoders for quantum error correction}
+An error-correcting code reports a \emph{syndrome}, a pattern of parity checks, from which a decoder
+must infer the most likely error. Torlai and Melko \citeyearpar{torlai2017decoder} trained a neural network
+to do this for topological codes. Fast, accurate decoders are a bottleneck for fault-tolerant hardware,
+and machine-learned decoders are an active area.
+
+\subsection{Calibration, control and characterisation}
+Machine learning tunes the hardware itself: optimising control pulses, calibrating gates, and
+estimating noise. Bukov et~al. \citeyearpar{bukov2018} used reinforcement learning to find control protocols
+for preparing target states. The review by Gebhart et~al. \citeyearpar{gebhart2023} surveys learning for
+characterisation, verification and control.
+
+\begin{inshort}
+\QC\ uses classical ML to understand and control quantum systems: phase detection, neural-network
+states and tomography, classical shadows, decoders and calibration. It works today, at scale, because
+the learner is classical.
+\end{inshort}
+
+% ===========================================================================
+\section{QQ: quantum data, quantum processing}
+\label{sec:qq}
+% ===========================================================================
+
+In \QQ\ the data is already quantum, and a quantum computer processes it directly without first
+measuring it into classical numbers. This avoids the information loss of measurement
+(\cref{sec:prelim}) and the data-loading problem of \cref{sec:loading}, because nothing needs to be
+loaded.
+
+\subsection{Quantum convolutional neural networks}
+Cong, Choi and Lukin \citeyearpar{cong2019} proposed a circuit with the structure of a convolutional network.
+\emph{Convolution} layers apply the same quasi-local unitary across the register; \emph{pooling}
+layers measure some qubits and use the results to rotate their neighbours, halving the system size;
+a final fully connected unitary acts on the few remaining qubits. For $N$ input qubits a QCNN has
+only $O(\log N)$ variational parameters. It was shown to recognise symmetry-protected topological
+phases directly from the quantum state, and its structure helps avoid barren plateaus.
+
+\subsection{Quantum autoencoders}
+Romero, Olson and Aspuru-Guzik \citeyearpar{romero2017} train an encoder $U(\theta)$ that compresses a
+family of $n$-qubit states into $n-k$ qubits. The cost asks the $k$ discarded (``trash'') qubits to end
+up in a fixed reference state; if they do, the state can be decoded with $U(\theta)^\dagger$ without
+loss. Applications include compressing the output of quantum simulations and denoising.
+
+\subsection{Learning with quantum memory}
+The strongest results in \QQ\ concern \emph{learning from experiments}. A conventional learner
+measures each copy of an unknown state or each use of an unknown process and learns from the
+classical outcomes. A quantum-enhanced learner stores copies in quantum memory and processes them
+jointly, for example with entangled measurements across two copies. Huang et~al. \citeyearpar{huang2022}
+proved that for several tasks, such as predicting properties of physical systems and learning about
+unknown quantum processes, conventional learners need exponentially more experiments than
+quantum-enhanced ones, and demonstrated the effect on a superconducting processor. This is a provable,
+experimentally tested separation, the clearest one in QML so far.
+
+\subsection{Quantum metrology}
+Estimating an unknown parameter $\varphi$ (a phase, a field, a frequency) is a learning task on
+quantum data. With $N$ independent probes, the error scales as the standard quantum limit
+$\Delta\varphi\propto1/\sqrt{N}$; entangled probes and quantum processing can reach the Heisenberg
+limit $\Delta\varphi\propto1/N$ \citep{giovannetti2011}. Adaptive, learning-based estimation strategies
+connect metrology with machine learning \citep{gebhart2023}.
+
+\subsection{What QQ needs}
+\QQ\ needs a quantum data source \emph{connected} to a quantum processor: a quantum sensor, a quantum
+simulator or a quantum network link feeding qubits into a processor without measuring them. Such
+pipelines exist only in early experiments, which is why \QQ\ is the most promising quadrant in theory
+and the least developed in practice.
+
+\begin{inshort}
+\QQ\ processes quantum states without measuring them first. It has the clearest theoretical case for
+quantum advantage, including proven exponential separations in learning from experiments, but it needs
+quantum data sources wired directly to quantum processors.
+\end{inshort}
+
+% ===========================================================================
+\section{Comparing the quadrants}
+% ===========================================================================
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ & Key concepts & Main obstacle & Representative work \\
+\midrule
+\CC & tensor networks, $\ell_2$-norm sampling, dequantisation & none quantum; must beat strong baselines & \citealp{stoudenmire2016,tang2019,chia2022} \\
+\CQ & feature maps, variational circuits, parameter shift, kernels, HHL & data loading, barren plateaus, concentration, noise & \citealp{havlicek2019,schuld2019feature,mitarai2018,harrow2009,mcclean2018} \\
+\QC & phase classification, neural quantum states, classical shadows, decoders & measurement cost, model expressivity & \citealp{carrasquilla2017,carleo2017,torlai2018,huang2020shadows} \\
+\QQ & QCNNs, autoencoders, quantum memory, metrology & connecting quantum data sources to processors & \citealp{cong2019,romero2017,huang2022,giovannetti2011} \\
+\bottomrule
+\end{tabularx}
+\caption{Concepts, obstacles and key references per quadrant.}
+\label{tab:compare}
+\end{table}
+
+\paragraph{Where does quantum advantage come from?}
+\CC\ and \QC\ use classical computers, so they work at scale today. In \CQ\ the case for advantage
+rests on feature spaces or linear algebra that are hard to simulate classically, but it is weakened
+by data loading, dequantisation and the trainability problems above. In \QQ\ the advantage has a
+simple source: measuring destroys information, and a quantum processor can avoid measuring.
+
+\paragraph{Is advantage the right goal?}
+Schuld and Killoran \citeyearpar{schuld2022advantage} argue that chasing speed-up claims has distorted the
+field, and that QML should also be studied for what it teaches about learning, quantum models and
+their inductive biases. Bowles, Ahmed and Schuld \citeyearpar{bowles2024} benchmarked many published quantum
+models on standard tasks and found that well-tuned classical models usually matched or beat them, and
+that removing entanglement often did not hurt. Careful benchmarking is part of doing QML well.
+
+% ===========================================================================
+\section{Where the QML Lab project fits}
+% ===========================================================================
+
+The QML Lab is a ten-week study plan (modules~1--8) built on PennyLane \citep{bergholm2018} and
+Qiskit \citep{javadiabhari2024}, plus sixteen open-ended research projects managed in a Django portal.
+Its base is \CQ: the modules encode classical data into qubits and train circuits and kernels on it.
+Every project also carries a classical baseline, which is \CC\ by design.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}Xl@{}}
+\toprule
+Module & Topic & Quadrant \\
+\midrule
+1--3 & Qubits, gates, entanglement, parameter-shift gradients & foundations \\
+4 & Data encoding: angle, amplitude, ZZ feature maps & \CQ \\
+5 & Variational classifier with data re-uploading & \CQ \\
+6 & Quantum kernels and SVM, with an RBF baseline & \CQ\ (+ \CC\ baseline) \\
+7 & Hybrid quantum--classical network in PyTorch & \CQ\ (+ \CC\ baseline) \\
+8 & Barren plateaus and noise & \CQ\ trainability \\
+\bottomrule
+\end{tabularx}
+\caption{The learning modules and their quadrant.}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}rl>{\raggedright\arraybackslash}X@{}}
+\toprule
+\# & Project & Quadrant and reason \\
+\midrule
+1  & Quantum-kernel intrusion detection & \CQ: network-traffic features, quantum kernel \\
+2  & Trainable quantum kernels & \CQ: learned feature map \\
+3  & Projected vs fidelity kernels & \CQ; borders \CC\ through classical simulability \\
+4  & Re-uploading depth study on MNIST & \CQ \\
+5  & QAOA for MaxCut with learned angles & \QC-like: a classical model learns to set up a quantum algorithm \citep{farhi2014} \\
+6  & Quantum autoencoder & \QQ: compresses quantum states \\
+7  & Quantum GAN for a 1-D distribution & \CQ \\
+8  & Hybrid modulation classifier & \CQ \\
+9  & Quantum transfer learning & \CQ \\
+10 & Quantum reinforcement learning on CartPole & \CQ \\
+11 & Quantum reservoir computing & \CQ \\
+12 & QCNN for phase classification & \QQ: quantum ground states in, quantum processing \\
+13 & Learning from classical shadows & \QC: random measurements, classical estimation \\
+14 & Noise-aware training with error mitigation & \CQ\ under realistic noise \\
+15 & Barren-plateau mitigation & \CQ\ trainability \\
+16 & Simulator vs IBM hardware benchmark & \CQ\ on real hardware \\
+\bottomrule
+\end{tabularx}
+\caption{The sixteen research projects by quadrant.}
+\end{table}
+
+Each project has its own living document (\path{qml_projects/<slug>/docs/main.tex}) with background,
+research questions, method, planned experiments and a results log, using the same Harvard-style
+bibliography as this overview.
+
+\paragraph{Reading the mapping.}
+Twelve of the sixteen projects are \CQ, matching the tools and simulators available. For a thesis
+with a stronger theoretical case for quantum advantage, projects~6 and~12 (\QQ) are the natural
+direction; project~13 (\QC) is the most immediately useful for work on real hardware. Every project
+follows the same quality bar: a classical baseline of similar size, several random seeds, scaling
+with qubit count, and at least one run under a realistic noise model \citep{bowles2024}.
+
+% ===========================================================================
+\section{Glossary}
+% ===========================================================================
+
+\begin{description}[leftmargin=1.2em,style=nextline,font=\normalfont\bfseries]
+  \item[Ansatz] The fixed structure of a parameterised circuit; only its angles are trained.
+  \item[Barren plateau] A cost landscape whose gradients vanish exponentially with qubit number.
+  \item[Bond dimension] The size of the indices linking tensors in a tensor network; it bounds the
+        correlations the network can represent.
+  \item[Classical shadow] A classical record of randomised measurements used to predict many
+        properties of a quantum state.
+  \item[Data re-uploading] Encoding the same input several times between trainable layers to make
+        the model more expressive.
+  \item[Dequantisation] A classical algorithm that matches a claimed quantum speed-up under the same
+        input assumptions.
+  \item[Exponential concentration] Kernel values or expectation values collapsing toward a constant
+        as qubits are added, so that exponentially many shots are needed to resolve them.
+  \item[Feature map] The map $x\mapsto\ket{\psi(x)}$ from data to quantum states.
+  \item[NISQ] Noisy intermediate-scale quantum: today's devices with tens to hundreds of noisy qubits
+        and no full error correction \citep{preskill2018}.
+  \item[Parameter-shift rule] Exact gradients of circuit outputs from two shifted circuit runs.
+  \item[QRAM] Quantum random access memory: a hypothetical device that loads classical data into
+        superposition efficiently.
+  \item[Quantum data] Data that is a quantum state or process, not a classical description of one.
+  \item[Shot] One execution and measurement of a circuit; expectation values are averages over shots.
+\end{description}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

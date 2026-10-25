@@ -1,0 +1,7 @@
+number = 11
+title = "Quantum reservoir computing for time series"
+track = "hybrid"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "medium"  # easy | medium | hard
+tools = "PennyLane, scikit-learn"
+builds_on = [2, 4]  # module numbers
+summary = "Use a fixed random circuit as a reservoir and train only a linear read-out to forecast a signal."

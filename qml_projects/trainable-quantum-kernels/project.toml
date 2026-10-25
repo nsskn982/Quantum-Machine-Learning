@@ -1,0 +1,7 @@
+number = 2
+title = "Trainable quantum kernels"
+track = "kernels"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "medium"  # easy | medium | hard
+tools = "PennyLane"
+builds_on = [3, 6]  # module numbers
+summary = "Tune feature-map angles to maximise kernel-target alignment, then compare with a fixed ZZ map."

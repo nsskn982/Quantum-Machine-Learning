@@ -1,0 +1,221 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 15: Barren-Plateau Mitigation
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 15: Barren-Plateau Mitigation}
+
+\hypersetup{pdftitle={QML Lab project 15: Barren-Plateau Mitigation}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 15}}\\[0.5em]
+  {\LARGE\bfseries Barren-Plateau Mitigation}\\[0.6em]
+  {\large Comparing strategies that keep gradients alive as circuits grow.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Noise and hardware \\
+Difficulty & Medium & Tools & PennyLane \\
+Builds on & Module 8 of the QML Lab & Workspace & \path{qml_projects/barren-plateau-mitigation/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+Module 8 showed that gradients of random deep circuits vanish exponentially with the number of qubits.
+This project compares the main remedies, local cost functions, small-angle and identity-block
+initialisation, and layerwise training, by gradient variance at initialisation and by what they achieve
+after a fixed training budget. It also asks the uncomfortable question raised by recent theory: are the
+circuits that avoid barren plateaus the ones a classical computer can simulate?
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Barren plateaus}
+For a cost $C(\theta)=\Tr[O\,U(\theta)\rho U(\theta)^\dagger]$ and sufficiently random circuits,
+\citet{mcclean2018} showed
+\begin{equation}
+  \E_\theta[\partial_kC]=0,\qquad \operatorname{Var}_\theta[\partial_kC]\in O(b^{-n}),\ b>1 .
+\end{equation}
+Exponentially many shots would be needed to estimate a gradient. \citet{cerezo2021cost} showed that the
+choice of cost matters: global observables (acting on all qubits) give barren plateaus even for shallow
+circuits, local observables on shallow circuits keep gradients polynomially large. \citet{holmes2022}
+linked the effect to expressibility: the closer the circuit ensemble is to random unitaries, the flatter the
+landscape. Noise adds its own plateau \citep{wang2021noise}.
+
+\subsection{Mitigation strategies}
+\begin{description}[style=nextline,leftmargin=1.2em]
+  \item[Identity-block initialisation] \citet{grant2019} build the circuit from blocks
+        $U_b(\theta_b)\,U_b(\theta_b')^\dagger$ initialised with $\theta_b'=\theta_b$, so the whole circuit
+        starts as the identity and early gradients are large.
+  \item[Small-angle initialisation] Drawing $\theta\sim\mathcal N(0,\sigma^2)$ with small $\sigma$ keeps the
+        circuit near the identity at the start.
+  \item[Layerwise learning] \citet{skolik2021} train a few layers at a time and freeze them, adding depth
+        gradually.
+  \item[Local costs] Replace a global observable such as $Z^{\otimes n}$ by a sum of local ones.
+\end{description}
+
+\subsection{The simulability caveat}
+\citet{cerezo2023simulability} argue that many architectures with provable absence of barren plateaus
+can be simulated efficiently classically, because their relevant dynamics lives in a small subspace. A
+complete study should therefore ask, for each successful strategy, whether a classical surrogate could
+reproduce it.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item Which strategy keeps gradient variance flattest as the number of qubits grows from 2 to 12?
+  \item Does a larger initial gradient translate into a lower final loss after a fixed training budget?
+  \item How do strategies combine, for example local cost with identity-block initialisation?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+Two training tasks: learning to return a randomly prepared state to $\ket{0\cdots0}$ (a controllable
+state-learning problem), and the Module 5 classifier on two moons with increasing qubit numbers.
+
+\subsection{Models}
+The hardware-efficient ansatz of Module 8 with $L=n$ layers, extended with the parameters
+\texttt{init\_strategy} (uniform, small-angle, identity-block), \texttt{cost} (global, local) and
+\texttt{training} (all layers, layerwise). Gradient variances from 200 random initialisations per setting.
+
+\subsection{Baselines}
+Module 8's configuration (uniform initialisation, global cost) as the reference; analytic
+$O(2^{-n})$ scaling as a guide.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item $\operatorname{Var}[\partial_kC]$ versus $n$ on a log scale, with fitted decay rate.
+  \item Final loss and steps to reach a threshold after a fixed budget.
+  \item Evidence for or against classical simulability of the successful settings.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Reproduce Module 8 & $n=2..12$, uniform, global & variance slope \\
+  E2 & Initialisation & uniform, small-angle, identity-block & variance, final loss \\
+  E3 & Cost locality & global vs local & variance, final loss \\
+  E4 & Layerwise learning & layers added per stage & final loss \\
+  E5 & Combinations and noise & best pairs, depolarizing $p$ & final loss \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/barren-plateau-mitigation/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/barren-plateau-mitigation/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "init-strategies"
+title = "Gradient variance by initialisation strategy"
+script = "experiments/e01_init_strategies.py"
+figure = "variance_by_strategy.png"
+
+[experiments.params]
+max_qubits = 12
+init_strategy = "identity_block"
+cost = "local"
+samples = 200
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/barren-plateau-mitigation
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_init_strategies.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Report both gradient variance at initialisation and final loss; one without the other is misleading.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Symmetry-respecting (equivariant) ans\"atze.
+  \item Warm starts from classical solutions or from smaller circuits.
+  \item Classical surrogates for the trainable regimes, testing the simulability argument directly.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item Large initial gradients do not guarantee good final solutions.
+  \item Identity-block initialisation helps only at the start of training.
+  \item State-vector memory limits the study to about 14 qubits.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

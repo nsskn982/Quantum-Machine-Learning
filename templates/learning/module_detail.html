@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Module {{ module.number }}{% endblock %}
+{% block extra_head %}
+<script>window.MathJax = {tex: {inlineMath: [["\\(", "\\)"]]}};</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="{% url 'dashboard' %}">Modules</a> / Module {{ module.number }}</nav>
+<header class="page-head">
+  <div class="eyebrow">Week {{ module.week }} · {{ module.tool }}</div>
+  <h1>{{ module.title }}</h1>
+  <p class="lede">{{ module.summary }}</p>
+</header>
+
+<div class="two-col">
+  <article class="main-col">
+    <section>
+      <h2>Concept</h2>
+      {% for p in paragraphs %}<p>{{ p }}</p>{% endfor %}
+      {% if module.formula %}<div class="formula">\[ {{ module.formula }} \]</div>{% endif %}
+    </section>
+
+    <section>
+      <h2>See it</h2>
+      {% if latest %}
+        <figure class="figure">
+          <img src="{{ latest.primary_figure.file.url }}" alt="{{ module.figure_caption }}">
+          <figcaption>{{ module.figure_caption }} <a href="{{ latest.get_absolute_url }}">Run {{ latest.pk }}, {{ latest.finished|date:"j M, H:i" }}</a>{% if latest.params %} · {% for k, v in latest.params.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}</figcaption>
+        </figure>
+      {% else %}
+        <p class="empty">No figure yet. Run the script to produce it: {{ module.figure_caption }}</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <div class="panel-head">
+        <h2>Build: <code>{{ module.script }}</code></h2>
+        <a href="{% url 'module_script' module.slug %}">Download</a>
+      </div>
+      {% if source %}<pre class="code"><code>{{ source }}</code></pre>
+      {% else %}<p class="empty">{{ module.script }} is not in qml_lab/ on this server.</p>{% endif %}
+    </section>
+  </article>
+
+  <aside class="side-col">
+    <section class="panel">
+      <h2>Run on the server</h2>
+      {% if can_run %}
+      <form method="post" action="{% url 'module_run' module.slug %}" class="stack">
+        {% csrf_token %}
+        {% if params_form.fields %}<div class="params">{{ params_form.as_div }}</div>{% endif %}
+        <button class="btn" type="submit">Run {{ module.script }}</button>
+      </form>
+      <p class="muted small">Runs with a headless matplotlib backend. Larger modules (5, 7, 8) can take a few minutes.</p>
+      {% elif runs_enabled %}
+      <p class="muted small">Only staff accounts can run scripts here. <a href="{% url 'module_script' module.slug %}">Download the script</a> and run it locally.</p>
+      {% else %}
+      <p class="muted small">Running scripts is turned off here. <a href="{% url 'module_script' module.slug %}">Download the script</a> and run it locally.</p>
+      {% endif %}
+      {% if runs %}
+      <ul class="runs">
+        {% for r in runs %}
+        <li><a href="{{ r.get_absolute_url }}">Run {{ r.pk }}</a> <span class="pill pill-{{ r.status }}">{{ r.get_status_display }}</span> <span class="muted small">{{ r.created|date:"j M H:i" }}</span>
+          {% if r.metrics %}<div class="muted small">{% for k, v in r.metrics.items %}{{ k }} {{ v|floatformat:3 }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Checkpoint</h2>
+      <p>{{ module.checkpoint }}</p>
+      <form method="post" class="stack">
+        {% csrf_token %}
+        <label for="{{ form.status.id_for_label }}">Your status</label>{{ form.status }}
+        <label for="{{ form.notes.id_for_label }}">Notes</label>{{ form.notes }}
+        <button class="btn btn-quiet" type="submit">Save progress</button>
+      </form>
+    </section>
+
+    {% if related_projects %}
+    <section class="panel">
+      <h2>Projects that build on this</h2>
+      <ul class="plain">
+        {% for p in related_projects %}<li><a href="{{ p.get_absolute_url }}">{{ p.title }}</a></li>{% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+  </aside>
+</div>
+
+<nav class="pager">
+  {% if previous %}<a href="{{ previous.get_absolute_url }}">← Module {{ previous.number }}: {{ previous.title }}</a>{% else %}<span></span>{% endif %}
+  {% if next %}<a href="{{ next.get_absolute_url }}">Module {{ next.number }}: {{ next.title }} →</a>{% endif %}
+</nav>
+{% endblock %}

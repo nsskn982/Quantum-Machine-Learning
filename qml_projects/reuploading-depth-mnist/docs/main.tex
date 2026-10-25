@@ -1,0 +1,217 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 04: Re-uploading Depth Study on MNIST
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 04: Re-uploading on MNIST}
+
+\hypersetup{pdftitle={QML Lab project 04: Re-uploading Depth Study on MNIST}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 04}}\\[0.5em]
+  {\LARGE\bfseries Re-uploading Depth Study on MNIST}\\[0.6em]
+  {\large How do layers and qubits trade off in a small data re-uploading classifier for handwritten digits?}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Variational \\
+Difficulty & Easy & Tools & PennyLane, scikit-learn \\
+Builds on & Module 5 of the QML Lab & Workspace & \path{qml_projects/reuploading-depth-mnist/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+A data re-uploading circuit encodes the input again before every trainable layer, which lets even a
+few qubits express complicated functions. This project maps how test accuracy on pairs of
+handwritten digits depends on the number of layers and qubits, and compares every configuration with
+logistic regression and a small MLP on the same PCA features. It is the entry project of the lab and
+already has a runnable experiment.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Digits and PCA}
+MNIST \citep{lecun1998} has $28\times28$ images of handwritten digits. The scikit-learn digits set,
+used here first, is the smaller UCI collection of $8\times8$ images \citep{alpaydin1998}, with about
+180 images per class. PCA reduces each image to $n$ components, one per qubit, scaled to $[0,\pi]$.
+
+\subsection{Variational classifier}
+As in Module 5, the model is the expectation value of $Z$ on the first qubit after a parameterised
+circuit,
+\begin{equation}
+  f_\theta(x)=\braket{0|\,U(x,\theta)^\dagger Z_0\,U(x,\theta)\,|0}+b,\qquad
+  U(x,\theta)=\prod_{\ell=1}^{L}W(\theta_\ell)\,S(x),
+\end{equation}
+where $S(x)$ is angle encoding and $W(\theta_\ell)$ a strongly entangling layer with $3n$ angles. The
+classifier has $3nL+1$ trainable parameters \citep{schuld2020circuit}. Training minimises the
+mean squared error to labels $\pm1$ with Adam \citep{kingma2015}.
+
+\subsection{Why re-uploading helps}
+\citet{schuld2021fourier} showed that such a model is a truncated Fourier series in the inputs,
+\begin{equation}
+  f_\theta(x)=\sum_{\omega\in\Omega}c_\omega(\theta)\,e^{i\omega\cdot x},
+\end{equation}
+and that each repetition of the encoding adds frequencies to $\Omega$. With one encoding the model is
+a single sine per feature; with $L$ repetitions it reaches frequency $L$
+\citep{perezsalinas2020}. Layers therefore buy expressivity, while qubits buy input features.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item Where does adding layers stop improving test accuracy on 4 PCA features?
+  \item For a fixed parameter budget, is it better to add qubits (features) or layers (depth)?
+  \item How far is the best circuit from logistic regression and a small MLP on the same features?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+Digit pairs from the scikit-learn digits set: 3 vs 5 (default), 4 vs 9 and 1 vs 7. A stratified
+70/30 train/test split per seed; PCA and scaling are fitted on the training part only. Later, full
+MNIST reduced with PCA.
+
+\subsection{Models}
+The existing \texttt{baseline} experiment: $n$ qubits, $L$ re-uploading layers of
+\texttt{AngleEmbedding} plus \texttt{StronglyEntanglingLayers}, MSE loss, Adam with learning rate 0.1,
+mini-batches of 32, 15 epochs.
+
+\subsection{Baselines}
+Logistic regression on the same PCA features (already logged as \texttt{baseline\_accuracy});
+an MLP and an RBF-SVM with matched parameter counts.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Test accuracy (mean $\pm$ s.d. over 5 seeds) and final training loss.
+  \item Number of trainable weights; training time per epoch.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Depth sweep & $L\in\{1,2,4,6\}$, $n=4$ & test accuracy \\
+  E2 & Qubit sweep & $n\in\{2,4,6,8\}$, $L=2$ & test accuracy \\
+  E3 & Equal budget & $(n,L)$ pairs with $\approx$ same $3nL$ & accuracy per parameter \\
+  E4 & Hard pairs & 3 vs 5, 4 vs 9, 1 vs 7 & gap to baselines \\
+  E5 & Full MNIST & $28\times28$ images, PCA & accuracy, run time \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/reuploading-depth-mnist/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/reuploading-depth-mnist/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment already exists in the workspace and can be run from the project page.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "baseline"
+title = "Re-uploading classifier vs logistic regression"
+script = "experiments/e01_baseline.py"
+figure = "baseline.png"
+
+[experiments.params]
+digit_a = 3
+digit_b = 5
+n_qubits = 4
+n_layers = 2
+epochs = 15
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/reuploading-depth-mnist
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_baseline.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Fit PCA and scaling on training data only, so the test set stays unseen.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Multi-class classification with one readout qubit per class.
+  \item Amplitude encoding of the full $8\times8$ image on 6 qubits.
+  \item Trainable input scaling, which changes the available Fourier frequencies.
+  \item Repeat the best configuration under a noise model (Project 14).
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item Small test sets (about 100 images per pair) give noisy accuracies; always use several seeds.
+  \item PCA features of easy pairs are almost linearly separable, so all models may hit a ceiling.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

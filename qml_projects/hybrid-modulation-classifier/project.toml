@@ -1,0 +1,7 @@
+number = 8
+title = "Hybrid modulation classifier"
+track = "hybrid"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "medium"  # easy | medium | hard
+tools = "PennyLane, PyTorch"
+builds_on = [7]  # module numbers
+summary = "Classify BPSK, QPSK and 16-QAM from synthetic I/Q samples at different SNR."

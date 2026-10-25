@@ -1,0 +1,22 @@
+number = 4
+title = "Re-uploading depth study on MNIST"
+track = "variational"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "easy"  # easy | medium | hard
+tools = "PennyLane, scikit-learn"
+builds_on = [5]  # module numbers
+summary = "Classify PCA-reduced digits (4-8 features); chart accuracy against layers and qubits."
+
+[[experiments]]
+slug = "baseline"
+title = "Re-uploading classifier vs logistic regression"
+script = "experiments/e01_baseline.py"
+figure = "baseline.png"
+description = "Two digits, PCA to n_qubits features, data re-uploading circuit; logistic regression as the baseline."
+
+[experiments.params]
+digit_a = 3
+digit_b = 5
+n_qubits = 4
+n_layers = 2
+epochs = 15
+seed = 0

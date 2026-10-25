@@ -1,0 +1,218 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 13: Learning from Classical Shadows
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 13: Learning from Classical Shadows}
+
+\hypersetup{pdftitle={QML Lab project 13: Learning from Classical Shadows}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 13}}\\[0.5em]
+  {\LARGE\bfseries Learning from Classical Shadows}\\[0.6em]
+  {\large Predicting many properties of a quantum state from few randomised measurements.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \QC\ (quantum data or quantum algorithm, classical learner) & Track & Quantum data \\
+Difficulty & Hard & Tools & PennyLane, NumPy, scikit-learn \\
+Builds on & Modules 2 and 8 of the QML Lab & Workspace & \path{qml_projects/classical-shadows/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+Full quantum state tomography needs a number of measurements that grows exponentially with the number
+of qubits. Classical shadows replace it with randomised single-qubit measurements and simple classical
+post-processing, and predict many properties at once with far fewer measurements. This project
+measures how estimation error scales, compares shadows with tomography, and uses shadow-based features
+to train a classical phase classifier, linking it to the QCNN of Project 12.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Randomised measurements}
+Randomised measurement protocols apply random unitaries before measuring and learn from the
+statistics of the outcomes \citep{elben2023}. In the classical-shadow protocol of
+\citet{huang2020shadows}, each round applies a random single-qubit Clifford $U_j$ to every qubit (a random
+choice of the $X$, $Y$ or $Z$ basis), measures, and stores the snapshot
+\begin{equation}
+  \hat\rho=\bigotimes_{j=1}^{n}\Big(3\,U_j^\dagger\ket{\hat b_j}\!\bra{\hat b_j}U_j-I\Big),
+\end{equation}
+which is an unbiased estimator of $\rho$: $\E[\hat\rho]=\rho$.
+
+\subsection{Sample complexity}
+Expectation values $o_i=\Tr(O_i\rho)$ are estimated by median-of-means over snapshots. To predict $M$
+observables to accuracy $\epsilon$ with high probability, it suffices to take
+\begin{equation}
+  N_{\text{snap}}=O\!\Big(\frac{\log M}{\epsilon^2}\max_i\lVert O_i\rVert_{\text{shadow}}^2\Big),
+  \qquad \lVert O\rVert_{\text{shadow}}^2\le 3^k\lVert O\rVert_\infty^2
+\end{equation}
+for $k$-local observables with Pauli measurements. Local properties are cheap; global ones are not.
+Non-linear quantities such as the purity $\Tr\rho_A^2$ and the second R\'enyi entropy
+$S_2(\rho_A)=-\log\Tr\rho_A^2$ follow from pairs of independent snapshots.
+
+\subsection{Machine learning on shadows}
+\citet{huang2022science377} proved that classical machine learning trained on classical-shadow data
+can efficiently predict ground-state properties and classify phases of matter. Neural-network
+tomography \citep{torlai2018} is an alternative that learns a model of the state from measurements.
+Both are \QC: the data comes from quantum states, the learning is classical.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item How does the estimation error of local observables and of subsystem entropy scale with the number of snapshots?
+  \item Which observables are cheap to estimate and which need prohibitively many snapshots?
+  \item Can a classical model trained on shadow features classify Ising phases as well as the QCNN of Project 12, for the same number of state copies?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+GHZ states, random product states and Ising ground states (shared with Project 12) on 4 to 10 qubits;
+$10^2$ to $10^4$ snapshots per state, generated with PennyLane's classical-shadow measurement.
+
+\subsection{Models}
+Shadow estimators for $\langle X_i\rangle$, $\langle Z_iZ_{i+1}\rangle$, the fidelity with a target state
+and $S_2$ of half the chain; full tomography by linear inversion for $n\le4$; a logistic regression or
+small MLP on shadow-estimated correlations for phase classification.
+
+\subsection{Baselines}
+Exact values from the state vector; full tomography with the same number of measurements; direct
+measurement in a fixed basis for each observable.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Absolute estimation error versus number of snapshots (log--log).
+  \item Snapshots needed to reach $\epsilon=0.05$.
+  \item Phase classification accuracy versus number of state copies.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Local observables & $N_{\text{snap}}=10^2..10^4$ & error scaling \\
+  E2 & Entanglement & $S_2$ of half chain & error vs $N_{\text{snap}}$ \\
+  E3 & Tomography comparison & $n\le4$, equal budget & error \\
+  E4 & Phase classifier & shadow features of Ising states & accuracy vs copies \\
+  E5 & Readout noise & bit-flip probability & bias \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/classical-shadows/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/classical-shadows/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "shadow-scaling"
+title = "Error scaling of classical-shadow estimates"
+script = "experiments/e01_shadow_scaling.py"
+figure = "error_scaling.png"
+
+[experiments.params]
+n_qubits = 6
+n_snapshots = 1000
+state = "ising"
+field = 1.0
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/classical-shadows
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_shadow_scaling.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Fit and report the error-scaling exponent; it should be close to $-1/2$.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Derandomised shadows for a fixed set of observables.
+  \item Shadows from real hardware, including readout mitigation.
+  \item Shared data set with Project 12 for a direct \QC\ versus \QQ\ comparison.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item Global observables need exponentially many snapshots; choose observables with this in mind.
+  \item Readout errors bias estimates unless mitigated.
+  \item Median-of-means parameters affect the error; keep them fixed across comparisons.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

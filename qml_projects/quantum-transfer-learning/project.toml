@@ -1,0 +1,7 @@
+number = 9
+title = "Quantum transfer learning"
+track = "hybrid"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "easy"  # easy | medium | hard
+tools = "PennyLane, PyTorch"
+builds_on = [7]  # module numbers
+summary = "Take ResNet-18 features from a small image set and feed them into a 4-qubit classifier head."

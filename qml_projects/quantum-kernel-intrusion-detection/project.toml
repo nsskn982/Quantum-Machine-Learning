@@ -1,0 +1,7 @@
+number = 1
+title = "Quantum-kernel intrusion detection"
+track = "kernels"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "medium"  # easy | medium | hard
+tools = "Qiskit, scikit-learn"
+builds_on = [4, 6]  # module numbers
+summary = "Quantum-kernel SVM on IoT traffic features after PCA (NSL-KDD or CIC-IoT), against an RBF SVM and an MLP."

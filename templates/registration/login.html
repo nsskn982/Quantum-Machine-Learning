@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<section class="narrow">
+  <h1>Log in</h1>
+  <p class="muted">Track your progress through the eight QML modules and claim projects.</p>
+  <form method="post" class="stack">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <label for="id_username">Username</label>{{ form.username }}
+    <label for="id_password">Password</label>{{ form.password }}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="btn">Log in</button>
+  </form>
+  {% if signup_enabled %}<p class="muted">No account yet? <a href="{% url 'signup' %}">Create one</a>.</p>{% endif %}
+</section>
+{% endblock %}

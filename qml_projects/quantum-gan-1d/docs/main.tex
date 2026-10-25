@@ -1,0 +1,215 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 07: Quantum GAN for a One-Dimensional Distribution
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 07: Quantum GAN}
+
+\hypersetup{pdftitle={QML Lab project 07: Quantum GAN for a One-Dimensional Distribution}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 07}}\\[0.5em]
+  {\LARGE\bfseries Quantum GAN for a One-Dimensional Distribution}\\[0.6em]
+  {\large Learning and loading a probability distribution with a quantum generator.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Variational \\
+Difficulty & Hard & Tools & Qiskit Machine Learning, PyTorch \\
+Builds on & Modules 5 and 7 of the QML Lab & Workspace & \path{qml_projects/quantum-gan-1d/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+A quantum generative adversarial network (qGAN) trains a parameterised circuit whose measurement
+outcomes follow a target distribution, guided by a classical discriminator. Besides generating
+samples, the trained circuit loads the distribution into amplitudes, which other quantum algorithms
+need as input. The project studies how well a qGAN learns discretised one-dimensional distributions,
+how stable the training is, and how it compares with small classical generators.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Generative adversarial networks}
+A GAN \citep{goodfellow2014} trains a generator $G$ and a discriminator $D$ in a two-player game,
+\begin{equation}
+  \min_G\max_D\ \E_{x\sim p_{\text{data}}}\big[\log D(x)\big]+\E_{z}\big[\log\big(1-D(G(z))\big)\big].
+\end{equation}
+The generator improves until the discriminator can no longer tell its samples from real data.
+
+\subsection{Quantum generators}
+Quantum versions were proposed by \citet{lloyd2018qgan} and \citet{dallairedemers2018}. In the qGAN of
+\citet{zoufal2019} the generator is an $n$-qubit circuit $U(\theta)$ whose output state
+\begin{equation}
+  \ket{g_\theta}=U(\theta)\ket{0}^{\otimes n}=\sum_{j=0}^{2^n-1}\sqrt{p_\theta(j)}\,e^{i\varphi_j}\ket{j}
+\end{equation}
+defines a distribution over $2^n$ bins: measuring returns bin $j$ with probability $p_\theta(j)$. The
+discriminator is a classical neural network that sees the sampled bin values. After training, the
+circuit is an efficient loader for the learned distribution.
+
+\subsection{Measuring success}
+Quality is measured by the relative entropy (Kullback--Leibler divergence) to the target $q$,
+\begin{equation}
+  D_{\mathrm{KL}}(q\,\Vert\,p_\theta)=\sum_jq(j)\log\frac{q(j)}{p_\theta(j)},
+\end{equation}
+and by the total variation distance. Training curves often oscillate, as in classical GANs.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item How many qubits (bins) are needed for a useful approximation of log-normal and bimodal targets?
+  \item Is training stable, or does it oscillate or collapse to one mode?
+  \item How does the KL divergence compare with a small classical GAN and with a directly parameterised histogram?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+Targets discretised to $2^n$ bins: a log-normal distribution (as in \citealp{zoufal2019}), a
+truncated normal and a bimodal mixture. Training samples are drawn from the discretised targets.
+
+\subsection{Models}
+Generator: hardware-efficient circuit with $R_Y$ rotations and CZ entanglers, $L$ layers, initialised
+from a uniform or normal-like distribution. Discriminator: small PyTorch MLP \citep{paszke2019}.
+Alternating updates with Adam; generator gradients through Qiskit Machine Learning's PyTorch connector.
+
+\subsection{Baselines}
+A classical GAN with a small MLP generator; a softmax-parameterised histogram with $2^n-1$
+parameters fitted by maximum likelihood (the best possible fit for the bins).
+
+\subsection{Metrics}
+\begin{itemize}
+  \item KL divergence and total variation distance to the target over training.
+  \item Oscillation amplitude of the loss curves (training stability).
+  \item Number of parameters and circuit evaluations.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Log-normal, 3 qubits & epochs & KL divergence \\
+  E2 & Resolution & $n=3,4,5$ qubits & KL, cost \\
+  E3 & Bimodal target & mixture weights & mode coverage \\
+  E4 & Generator depth & $L=1..4$ & KL, stability \\
+  E5 & Shots per step & $M\in\{100,1000\}$ & KL, stability \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/quantum-gan-1d/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/quantum-gan-1d/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "lognormal"
+title = "qGAN for a 3-qubit log-normal distribution"
+script = "experiments/e01_lognormal.py"
+figure = "distribution.png"
+
+[experiments.params]
+n_qubits = 3
+n_layers = 2
+epochs = 300
+shots = 1000
+target = "lognormal"
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/quantum-gan-1d
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_lognormal.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Show the learned histogram next to the target and the classical fits in every report.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Use the trained loader as input to amplitude estimation, the original application of \citet{zoufal2019}.
+  \item Quantum circuit Born machines trained with maximum mean discrepancy instead of a discriminator.
+  \item Two-dimensional distributions on more qubits.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item GAN training is unstable; use several seeds and report the spread.
+  \item For 8 bins a classical histogram fits exactly; the interest is in loading and scaling, not in beating it.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

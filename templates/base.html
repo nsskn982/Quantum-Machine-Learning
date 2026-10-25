@@ -1,0 +1,34 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}QML Lab{% endblock %} · QML Lab</title>
+  <link rel="stylesheet" href="{% static 'portal.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="{% url 'dashboard' %}"><span class="ket">|ψ⟩</span> QML Lab</a>
+      {% if user.is_authenticated %}
+      <nav class="nav">
+        <a href="{% url 'dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}aria-current="page"{% endif %}>Modules</a>
+        <a href="{% url 'project_list' %}" {% if 'project' in request.resolver_match.url_name %}aria-current="page"{% endif %}>Projects</a>
+        {% if user.is_staff %}<a href="{% url 'admin:index' %}">Admin</a>{% endif %}
+        <form method="post" action="{% url 'logout' %}" class="inline">
+          {% csrf_token %}<button class="link" type="submit">Log out {{ user.username }}</button>
+        </form>
+      </nav>
+      {% endif %}
+    </div>
+  </header>
+  <main class="wrap">
+    {% for message in messages %}
+      <p class="flash flash-{{ message.tags }}" role="status">{{ message }}</p>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="wrap footer">PennyLane · Qiskit · quantum machine learning</footer>
+</body>
+</html>

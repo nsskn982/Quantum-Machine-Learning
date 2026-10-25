@@ -1,0 +1,7 @@
+number = 16
+title = "Simulator vs IBM hardware benchmark"
+track = "noise_hardware"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "medium"  # easy | medium | hard
+tools = "Qiskit Runtime"
+builds_on = [2, 8]  # module numbers
+summary = "Run your best small model on a real IBM backend and report the accuracy gap and its sources."

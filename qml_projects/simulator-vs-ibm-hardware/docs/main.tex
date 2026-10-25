@@ -1,0 +1,216 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 16: Simulator vs IBM Hardware Benchmark
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 16: Simulator vs hardware}
+
+\hypersetup{pdftitle={QML Lab project 16: Simulator vs IBM Hardware Benchmark}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 16}}\\[0.5em]
+  {\LARGE\bfseries Simulator vs IBM Hardware Benchmark}\\[0.6em]
+  {\large Measuring and explaining the gap between simulated and real-device results.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Noise and hardware \\
+Difficulty & Medium & Tools & Qiskit, Qiskit Runtime, Qiskit Aer \\
+Builds on & Modules 2 and 8 of the QML Lab & Workspace & \path{qml_projects/simulator-vs-ibm-hardware/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+Every result in the lab so far comes from simulators. This project runs the best small model on a real
+IBM quantum processor, measures the gap to the simulator, and builds an error budget that explains where
+the gap comes from: readout errors, gate errors, transpilation and drift. It produces the lab's reference
+for what the other projects can expect on hardware.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{From circuit to device}
+A circuit must be transpiled to the device's native gates and qubit connectivity, which adds SWAP gates
+and depth. Qiskit \citep{javadiabhari2024} handles this, and Qiskit Runtime executes circuits through
+primitives (Sampler and Estimator) with optional error suppression and mitigation. Current devices are
+noisy intermediate-scale processors without full error correction \citep{preskill2018}.
+
+\subsection{Error sources}
+\begin{description}[style=nextline,leftmargin=1.2em]
+  \item[Gate errors] average error rates per gate, measured by randomised benchmarking \citep{magesan2011};
+        two-qubit gates dominate.
+  \item[Readout errors] described by a confusion matrix $A_{ij}=P(\text{read }i\,|\,\text{prepared }j)$; observed
+        distributions are $p_{\text{obs}}=Ap_{\text{true}}$ and can be partly inverted \citep{bravyi2021readout}.
+  \item[Decoherence] energy relaxation ($T_1$) and dephasing ($T_2$) limit circuit duration.
+  \item[Drift and crosstalk] calibration changes over hours and days; neighbouring qubits interfere.
+\end{description}
+
+\subsection{Error budget}
+The accuracy gap $\Delta=\text{acc}_{\text{sim}}-\text{acc}_{\text{hw}}$ is decomposed by simulating the
+same circuits with noise models that switch on one error source at a time, using the device's own
+calibration data. Hardware-efficient circuits \citep{kandala2017} keep the transpiled depth low.
+\citet{kim2023} showed that with careful mitigation, current processors can produce accurate expectation
+values on circuits beyond brute-force simulation, which sets the state of the art for what is achievable.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item How large is the accuracy gap between simulator and hardware, and how much of it is readout versus gate error?
+  \item How much does transpilation (layout, optimisation level) change the gap?
+  \item How stable are hardware results from one day to the next?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+The test set of the chosen model (Module 5 or Project 04 classifier with 2--4 qubits, 100 test points);
+trained weights are fixed beforehand on the simulator. Each run records backend name, date, calibration
+snapshot, transpiled depth and two-qubit gate count.
+
+\subsection{Models}
+Evaluation pipeline in Qiskit: exact state vector, shot-based simulation, Aer with noise models built from
+backend calibration (readout only, gates only, full), and the real backend via Runtime with and without
+readout mitigation. IBM Quantum credentials are read from the local Qiskit account, never stored in the
+repository.
+
+\subsection{Baselines}
+Exact simulation (upper bound); shot-based simulation with the same number of shots (pure sampling
+error); Aer with the full device noise model (prediction of hardware performance).
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Test accuracy and expectation-value error against exact values.
+  \item Accuracy gap $\Delta$ and its decomposition by error source.
+  \item Transpiled depth, two-qubit gate count and QPU time per run.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Sampling only & exact vs shots & accuracy, error \\
+  E2 & Noise components & readout / gates / full model & predicted $\Delta$ \\
+  E3 & Hardware run & real backend & measured $\Delta$ \\
+  E4 & Mitigation & resilience options & $\Delta$, overhead \\
+  E5 & Drift & same job on 3 days & spread of results \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/simulator-vs-ibm-hardware/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/simulator-vs-ibm-hardware/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "hardware-gap"
+title = "Simulator vs hardware accuracy for the Module 5 classifier"
+script = "experiments/e01_hardware_gap.py"
+figure = "gap_breakdown.png"
+
+[experiments.params]
+backend = "least_busy"
+shots = 4000
+optimization_level = 3
+mitigate_readout = true
+n_test = 100
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/simulator-vs-ibm-hardware
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_hardware_gap.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Record backend, date and calibration with every hardware result; without them a number cannot be reproduced.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Compare two backends or processor generations.
+  \item Run a quantum kernel (Project 01) and a trained policy (Project 10) on hardware.
+  \item Add zero-noise extrapolation from Project 14.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item Queue times and free-plan limits restrict the number of runs; plan circuits carefully.
+  \item Calibration drift makes single runs unreliable; repeat across days.
+  \item Never commit API tokens; use the local Qiskit account configuration.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

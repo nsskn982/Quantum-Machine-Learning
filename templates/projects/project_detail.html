@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }}{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="{% url 'project_list' %}">Projects</a> / {{ project.title }}</nav>
+<header class="page-head">
+  <div class="eyebrow">{% if project.number %}Project {{ project.number }} · {% endif %}{{ project.get_track_display }} · <span class="diff diff-{{ project.difficulty }}">{{ project.get_difficulty_display }}</span></div>
+  <h1>{{ project.title }}</h1>
+  <p class="lede">{{ project.summary }}</p>
+</header>
+
+<div class="two-col">
+  <article class="main-col">
+    <dl class="facts">
+      <dt>Status</dt><dd><span class="pill pill-{{ project.status }}">{{ project.get_status_display }}</span></dd>
+      {% if project.tools %}<dt>Tools</dt><dd>{{ project.tools }}</dd>{% endif %}
+      <dt>Builds on</dt>
+      <dd>{% for m in project.builds_on.all %}<a href="{{ m.get_absolute_url }}">Module {{ m.number }}: {{ m.title }}</a>{% if not forloop.last %}<br>{% endif %}{% empty %}–{% endfor %}</dd>
+      {% if project.repo_url %}<dt>Repository</dt><dd><a href="{{ project.repo_url }}" rel="noopener">{{ project.repo_url }}</a></dd>{% endif %}
+      <dt>Workspace</dt><dd>{% if has_workspace %}<code>qml_projects/{{ project.workspace }}/</code>{% else %}<span class="muted">None yet. Create one with <code>python manage.py new_project {{ project.slug }}</code></span>{% endif %}</dd>
+    </dl>
+
+    {% if readme %}
+    <section>
+      <h2>Plan and open questions</h2>
+      <pre class="readme">{{ readme }}</pre>
+      <p class="muted small">From <code>README.md</code> in the workspace. Edit the file to change the plan.</p>
+    </section>
+    {% endif %}
+
+    <section>
+      <h2>Experiments</h2>
+      {% for row in experiments %}
+      <div class="experiment" id="exp-{{ row.exp.slug }}">
+        <div class="panel-head">
+          <h3>{{ row.exp.title }}</h3>
+          <a class="small" href="{% url 'experiment_script' project.slug row.exp.slug %}">{{ row.exp.script }}</a>
+        </div>
+        {% if row.exp.description %}<p class="muted">{{ row.exp.description }}</p>{% endif %}
+        {% if row.latest %}
+        <figure class="figure">
+          <img src="{{ row.latest.primary_figure.file.url }}" alt="Latest figure for {{ row.exp.title }}" loading="lazy">
+          <figcaption><a href="{{ row.latest.get_absolute_url }}">Run {{ row.latest.pk }}</a>, {{ row.latest.finished|date:"j M H:i" }}</figcaption>
+        </figure>
+        {% endif %}
+
+        {% if can_run and is_member or can_run and user.is_staff %}
+        <details class="run-form">
+          <summary>Run with parameters</summary>
+          <form method="post" action="{% url 'experiment_run' project.slug row.exp.slug %}" class="stack">
+            {% csrf_token %}
+            {% if row.form.fields %}<div class="params">{{ row.form.as_div }}</div>{% endif %}
+            <button class="btn" type="submit">Run</button>
+          </form>
+        </details>
+        {% endif %}
+
+        {% if row.runs %}
+        <div class="table-scroll">
+          <table class="board compact">
+            <thead><tr><th>Run</th><th>Status</th><th>Parameters</th>{% for name in row.metric_names %}<th>{{ name }}</th>{% endfor %}</tr></thead>
+            <tbody>
+            {% for r in row.runs %}
+              <tr>
+                <td><a href="{{ r.get_absolute_url }}">{{ r.pk }}</a><div class="muted small">{{ r.created|date:"j M H:i" }}</div></td>
+                <td><span class="pill pill-{{ r.status }}">{{ r.get_status_display }}</span></td>
+                <td class="small">{% for k, v in r.params.items %}{{ k }}={{ v }}{% if not forloop.last %}, {% endif %}{% empty %}defaults{% endfor %}</td>
+                {% for name in row.metric_names %}<td class="num">{% for k, v in r.metrics.items %}{% if k == name %}{{ v|floatformat:3 }}{% endif %}{% endfor %}</td>{% endfor %}
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}<p class="muted small">No runs yet.</p>{% endif %}
+      </div>
+      {% empty %}
+      <p class="empty">No experiments yet. Add a script under <code>experiments/</code>, declare it in <code>project.toml</code>, then run <code>python manage.py sync_projects</code>.</p>
+      {% endfor %}
+    </section>
+
+    <section id="journal">
+      <h2>Journal</h2>
+      {% if entry_form %}
+      <form method="post" action="{% url 'entry_create' project.slug %}" class="stack panel">
+        {% csrf_token %}
+        <label for="{{ entry_form.kind.id_for_label }}">Type</label>{{ entry_form.kind }}
+        <label for="{{ entry_form.text.id_for_label }}">Entry</label>{{ entry_form.text }}
+        <button class="btn btn-quiet" type="submit">Add to journal</button>
+      </form>
+      {% endif %}
+      <ol class="journal">
+        {% for e in entries %}
+        <li class="entry entry-{{ e.kind }}">
+          <div class="entry-meta"><span class="pill">{{ e.get_kind_display }}</span> {{ e.author|default:"someone" }} · {{ e.created|date:"j M Y, H:i" }}
+            {% if e.run %}· <a href="{{ e.run.get_absolute_url }}">run {{ e.run.pk }}</a>{% endif %}</div>
+          <div>{{ e.text|linebreaksbr }}</div>
+        </li>
+        {% empty %}
+        <li class="muted">Nothing logged yet. Results, decisions and open questions go here.</li>
+        {% endfor %}
+      </ol>
+    </section>
+  </article>
+
+  <aside class="side-col">
+    <section class="panel">
+      <h2>People</h2>
+      <ul class="plain">
+        {% for m in members %}<li>{{ m }}{% if m == project.lead %} <span class="pill">lead</span>{% endif %}</li>
+        {% empty %}<li class="muted">Nobody yet.</li>{% endfor %}
+      </ul>
+      {% if is_member %}
+        <form method="post" action="{% url 'project_leave' project.slug %}">{% csrf_token %}<button class="link danger" type="submit">Leave the project</button></form>
+      {% elif project.status != "archived" %}
+        <form method="post" action="{% url 'project_join' project.slug %}">{% csrf_token %}<button class="btn" type="submit">Join this project</button></form>
+      {% endif %}
+    </section>
+
+    {% if settings_form %}
+    <section class="panel">
+      <h2>Project settings</h2>
+      <form method="post" action="{% url 'project_settings' project.slug %}" class="stack">
+        {% csrf_token %}
+        {{ settings_form.as_div }}
+        <button class="btn btn-quiet" type="submit">Save settings</button>
+      </form>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>Quality bar for results</h2>
+      <ul class="checklist small">
+        <li>A classical baseline with a similar number of parameters</li>
+        <li>At least 5 seeds, as mean ± standard deviation</li>
+        <li>How results change with qubit count</li>
+        <li>One run under a realistic noise model</li>
+      </ul>
+    </section>
+  </aside>
+</div>
+{% endblock %}

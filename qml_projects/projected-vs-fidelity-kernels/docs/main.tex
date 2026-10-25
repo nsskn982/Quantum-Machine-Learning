@@ -1,0 +1,223 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 03: Projected vs Fidelity Kernels
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 03: Projected vs Fidelity Kernels}
+
+\hypersetup{pdftitle={QML Lab project 03: Projected vs Fidelity Kernels}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 03}}\\[0.5em]
+  {\LARGE\bfseries Projected vs Fidelity Kernels}\\[0.6em]
+  {\large How fast do quantum kernels concentrate as qubits are added, and can projected kernels delay it?}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Kernels \\
+Difficulty & Hard & Tools & PennyLane, NumPy \\
+Builds on & Modules 6 and 8 of the QML Lab & Workspace & \path{qml_projects/projected-vs-fidelity-kernels/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+Quantum kernels are attractive because they use exponentially large feature spaces, but that same
+size makes kernel values concentrate: all pairs of points start to look equally (dis)similar. This
+project measures concentration for fidelity kernels and projected kernels from 2 to 12 qubits, for
+different feature maps and bandwidths, and with finite measurement shots. The result is a map of
+where quantum kernels remain usable.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Fidelity and projected kernels}
+The fidelity kernel compares whole states, $\kappa^{F}(x,x')=\Tr[\rho(x)\rho(x')]$. The projected
+kernel of \citet{huang2021power} compares only reduced single-qubit states $\rho_k(x)$:
+\begin{equation}
+  \kappa^{PQ}(x,x')=\exp\!\Big(-\gamma\sum_{k=1}^{n}\lVert\rho_k(x)-\rho_k(x')\rVert_F^2\Big),
+  \qquad
+  \lVert\rho_k-\rho_k'\rVert_F^2=\tfrac12\sum_{P\in\{X,Y,Z\}}\big(\langle P_k\rangle-\langle P_k\rangle'\big)^2 .
+\end{equation}
+It needs only single-qubit expectation values, which are cheap to measure, and it behaves like an
+RBF kernel on a learned, quantum-generated feature vector.
+
+\subsection{Exponential concentration}
+\citet{thanasilp2024} prove that for expressive embeddings, entangling embeddings, global
+measurements or noise, the kernel values concentrate around a fixed value with variance
+\begin{equation}
+  \operatorname{Var}_{x,x'}\big[\kappa(x,x')\big]\in O(b^{-n}),\qquad b>1 .
+\end{equation}
+With $M$ shots, a kernel entry is estimated with standard error about $\sqrt{\kappa(1-\kappa)/M}$, so
+once the spread of kernel values falls below this error the Gram matrix is dominated by shot noise.
+Projected kernels avoid the global overlap but also concentrate when reduced states approach the
+maximally mixed state.
+
+\subsection{Bandwidth and inductive bias}
+Scaling features by a bandwidth $\lambda$ keeps encoded states closer together and delays
+concentration \citep{shaydulin2022}. \citet{kubler2021} argue more generally that useful quantum
+kernels must restrict themselves to a small, task-relevant part of Hilbert space. A related warning
+is that settings that provably avoid concentration are often the ones that classical computers can
+simulate \citep{cerezo2023simulability}.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item At which qubit count does the off-diagonal variance of each kernel drop below the shot-noise level for $M=10^3$ and $10^4$ shots?
+  \item Does reducing the bandwidth delay concentration equally for fidelity and projected kernels?
+  \item How do the results depend on the feature map (IQP/ZZ versus a deep hardware-efficient embedding)?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+Synthetic inputs drawn uniformly from $[0,2\pi]^n$ to isolate the effect of the embedding, and a
+real data set (breast cancer, PCA to $n$ features) to see the effect on classification. For each
+qubit number $n=2,\dots,12$, 200 random pairs estimate the kernel statistics.
+
+\subsection{Models}
+Exact state-vector simulation of the IQP/ZZ map and of a hardware-efficient embedding with $L=n$
+layers. Fidelity kernels from state overlaps; projected kernels from single-qubit Pauli expectations
+with $\gamma$ set by the median heuristic. Finite-shot versions sample from the exact probabilities.
+For classification, both kernels feed a precomputed-kernel SVM.
+
+\subsection{Baselines}
+An RBF kernel on the same inputs (with tuned width) for the classification part; the analytic
+$O(2^{-n})$ reference curve for Haar-random states.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Mean and variance of off-diagonal kernel values versus $n$ (log scale).
+  \item Effective rank of the Gram matrix.
+  \item Test accuracy of the SVM and geometric difference to the RBF kernel.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Concentration curves & $n=2..12$, both kernels, IQP map & off-diagonal variance \\
+  E2 & Bandwidth & $\lambda$ sweep at each $n$ & variance, accuracy \\
+  E3 & Feature map & IQP vs hardware-efficient & variance slope \\
+  E4 & Finite shots & $M\in\{10^2,10^3,10^4\}$ & rank, accuracy \\
+  E5 & Classification & breast cancer, $n=2..10$ & accuracy, $g$ \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/projected-vs-fidelity-kernels/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/projected-vs-fidelity-kernels/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "concentration"
+title = "Kernel concentration from 2 to 12 qubits"
+script = "experiments/e01_concentration.py"
+figure = "concentration.png"
+
+[experiments.params]
+max_qubits = 12
+n_pairs = 200
+bandwidth = 1.0
+feature_map = "iqp"
+shots = 0
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/projected-vs-fidelity-kernels
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_concentration.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Plot variances on a log scale and fit the slope; report the fitted base $b$ with its uncertainty.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item $k$-body projected kernels that use reduced states of $k>1$ qubits.
+  \item Trainable bandwidth (connects to Project 02).
+  \item Check whether the non-concentrating regimes can be simulated classically \citep{cerezo2023simulability}.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item Conclusions depend on the input distribution; uniform synthetic data is a worst case.
+  \item The ``shot-noise threshold'' depends on the chosen $M$; report results for several values.
+  \item State-vector memory limits the study to about 14 qubits on a laptop.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

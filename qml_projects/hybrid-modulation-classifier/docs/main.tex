@@ -1,0 +1,221 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 08: Hybrid Modulation Classifier
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 08: Hybrid modulation classifier}
+
+\hypersetup{pdftitle={QML Lab project 08: Hybrid Modulation Classifier}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 08}}\\[0.5em]
+  {\LARGE\bfseries Hybrid Modulation Classifier}\\[0.6em]
+  {\large Recognising BPSK, QPSK and 16-QAM signals with a hybrid quantum--classical network.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Hybrid \\
+Difficulty & Medium & Tools & PennyLane, PyTorch, NumPy \\
+Builds on & Module 7 of the QML Lab & Workspace & \path{qml_projects/hybrid-modulation-classifier/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+Automatic modulation classification identifies how a received radio signal was modulated, a basic
+task in cognitive radio and spectrum monitoring. This project builds a hybrid network that feeds
+statistical signal features into a small quantum layer, and compares it with classical models across
+signal-to-noise ratios. It connects the QML Lab directly with communications engineering.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Signal model}
+After down-conversion, a received frame is a sequence of complex baseband samples
+\begin{equation}
+  r[k]=s[k]\,e^{j(2\pi\Delta f\,k+\phi)}+w[k],\qquad
+  \mathrm{SNR}=\frac{\E|s[k]|^2}{\E|w[k]|^2},
+\end{equation}
+where $s[k]$ are symbols from a constellation (BPSK, QPSK, 16-QAM), $\Delta f$ a small frequency
+offset, $\phi$ an unknown phase and $w[k]$ complex Gaussian noise.
+
+\subsection{Cumulant features}
+Higher-order cumulants are classic features for modulation recognition \citep{swami2000}. With
+$C_{20}=\E[r^2]$ and $C_{21}=\E|r|^2$,
+\begin{equation}
+  C_{40}=\E[r^4]-3C_{20}^2,\qquad C_{42}=\E|r|^4-|C_{20}|^2-2C_{21}^2 .
+\end{equation}
+Normalised by $C_{21}^2$, they take characteristic noise-free values, for example $\tilde C_{42}=-2$
+(BPSK), $-1$ (QPSK) and $-0.68$ (16-QAM), and Gaussian noise drives all cumulants above second order
+towards zero. They are compact (a handful of numbers per frame), which suits a few-qubit layer.
+
+\subsection{Learned features}
+Deep networks can also learn directly from raw I/Q samples: convolutional networks \citep{oshea2016}
+and residual networks on over-the-air data \citep{oshea2018} are strong baselines, especially at low SNR.
+
+\subsection{Hybrid model}
+As in Module 7, the hybrid network is
+$\text{features}\to\text{Linear}\to\text{4-qubit layer}\to\text{Linear}\to\text{softmax}$, trained
+end to end in PyTorch \citep{paszke2019}; the quantum layer returns one $\langle Z\rangle$ per qubit.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item At which SNR does each model break down, and does the hybrid model degrade differently from classical ones?
+  \item Which cumulant features suit a 4-qubit layer best, and does feature choice matter more than the model?
+  \item Does the quantum layer make the model more or less robust to phase and frequency offsets?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+Synthetic frames generated with NumPy: 128 samples per frame, random symbols, random phase, small
+frequency offsets, SNR from $-5$ to $20$\,dB in 5\,dB steps, 1000 frames per class and SNR. Features:
+normalised $|C_{40}|$, $|C_{42}|$, $C_{20}$ and amplitude statistics (6--8 numbers), plus raw I/Q for
+the CNN baseline.
+
+\subsection{Models}
+Hybrid network with $n=4$ qubits and 2 layers of basic entanglers between classical linear layers;
+cross-entropy loss, Adam, 30 epochs. A version trained per SNR and one trained on all SNRs together.
+
+\subsection{Baselines}
+MLP on the same cumulant features with matched parameter count; a decision tree with cumulant
+thresholds in the spirit of \citet{swami2000}; a small CNN on raw I/Q samples \citep{oshea2016}.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Accuracy versus SNR curve for every model.
+  \item Confusion matrices at low, medium and high SNR.
+  \item Parameter counts and training time.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Three classes & cumulant features, all SNRs & accuracy \\
+  E2 & SNR curve & SNR $-5..20$\,dB & accuracy per SNR \\
+  E3 & Qubit count & $n\in\{2,4,6\}$ & accuracy, parameters \\
+  E4 & Impairments & phase and frequency offset & robustness \\
+  E5 & More classes & add 8-PSK, 64-QAM & confusion matrix \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/hybrid-modulation-classifier/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/hybrid-modulation-classifier/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "three-class"
+title = "BPSK / QPSK / 16-QAM from cumulant features"
+script = "experiments/e01_three_class.py"
+figure = "accuracy_vs_snr.png"
+
+[experiments.params]
+n_qubits = 4
+n_layers = 2
+frame_len = 128
+epochs = 30
+snr_min = -5
+snr_max = 20
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/hybrid-modulation-classifier
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_three_class.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Always show accuracy as a function of SNR; a single averaged number hides where models fail.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Quantum convolution directly on raw I/Q windows.
+  \item Quantum kernel SVM on cumulant features (connects to Projects 01 and 02).
+  \item Real recordings from public radio data sets.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item At high SNR cumulants make the task nearly linear, so every model reaches 100\,\% and differences vanish.
+  \item At very low SNR all models fail; the interesting region is narrow.
+  \item The CNN sees more information (raw samples); compare like with like as well.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

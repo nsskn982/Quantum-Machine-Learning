@@ -1,0 +1,7 @@
+number = 5
+title = "QAOA for MaxCut with learned initial angles"
+track = "variational"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "medium"  # easy | medium | hard
+tools = "PennyLane, NetworkX"
+builds_on = [3, 5]  # module numbers
+summary = "Solve MaxCut on small graphs; train a classical model to predict good starting angles."

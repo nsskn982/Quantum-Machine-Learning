@@ -1,0 +1,7 @@
+number = 3
+title = "Projected vs fidelity kernels"
+track = "kernels"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "hard"  # easy | medium | hard
+tools = "PennyLane"
+builds_on = [6, 8]  # module numbers
+summary = "Measure how both kernel types concentrate as qubits grow from 2 to 12."

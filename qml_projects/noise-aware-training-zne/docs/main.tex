@@ -1,0 +1,217 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 14: Noise-Aware Training with Error Mitigation
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 14: Noise-aware training}
+
+\hypersetup{pdftitle={QML Lab project 14: Noise-Aware Training with Error Mitigation}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 14}}\\[0.5em]
+  {\LARGE\bfseries Noise-Aware Training with Error Mitigation}\\[0.6em]
+  {\large How much accuracy does zero-noise extrapolation recover for a classifier under realistic noise?}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Noise and hardware \\
+Difficulty & Medium & Tools & Qiskit Aer, Mitiq, PennyLane \\
+Builds on & Modules 5 and 8 of the QML Lab & Workspace & \path{qml_projects/noise-aware-training-zne/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+On today's hardware, noise shrinks every expectation value a model produces. This project trains and
+evaluates the variational classifier of Module 5 under realistic noise models and applies zero-noise
+extrapolation (ZNE) to recover noise-free values. It separates two questions that are often mixed up:
+whether noise changes the predicted class, and whether it biases the numbers the model relies on for
+training and calibration.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Noise in variational models}
+Gate errors, decoherence and readout errors make an expectation value $E(\lambda)$ depend on the
+noise strength $\lambda$, with $\lambda=1$ for the native device. Under global depolarizing noise,
+$E(\lambda)\approx(1-p)^{d}E_0$ shrinks exponentially with depth $d$. Noise also flattens the cost
+landscape, a noise-induced barren plateau \citep{wang2021noise}. Error mitigation reduces the bias
+of expectation values without full error correction \citep{cai2023}.
+
+\subsection{Zero-noise extrapolation}
+ZNE \citep{temme2017,kandala2019} measures $E(\lambda_k)$ at amplified noise levels
+$1=\lambda_1<\lambda_2<\dots$ and extrapolates to $\lambda=0$. Richardson extrapolation uses
+\begin{equation}
+  E(0)\approx\sum_k\gamma_kE(\lambda_k),\qquad \sum_k\gamma_k=1,\qquad \sum_k\gamma_k\lambda_k^{j}=0\ \ (j=1,\dots,K-1).
+\end{equation}
+Digital ZNE amplifies noise by unitary folding, $G\to G(G^\dagger G)^m$, which leaves the ideal circuit
+unchanged but multiplies its noise by $\lambda=1+2m$ \citep{giurgica2020}. Mitiq implements these
+methods for Qiskit and PennyLane circuits \citep{larose2022}. The price is variance: extrapolated values
+need many more shots.
+
+\subsection{Why the class may survive noise}
+If noise only rescales $E$ towards 0, the sign of $f(x)=E(x)+b$ changes only for points close to the
+decision boundary. Accuracy can therefore be surprisingly robust, while training (which needs gradient
+magnitudes) and calibrated probabilities suffer. Measuring both is part of the project.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item Is it better to train with noise, or to train noise-free and mitigate at test time?
+  \item How much does ZNE recover in accuracy and in expectation-value error, and at what shot overhead?
+  \item Does a device-based noise model lead to different conclusions than simple depolarizing noise?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+Two moons and digits (Project 04 features), with the splits used in Module 5 and Project 04 so that
+noise-free results are directly comparable.
+
+\subsection{Models}
+The Module 5 re-uploading classifier ($n=2$--4 qubits, $L=1$--3 layers). Noise models in Qiskit Aer:
+depolarizing errors on one- and two-qubit gates ($p_1=10^{-3}$, $p_2=10^{-2}$) plus readout error, and a
+noise model built from a real device's calibration data. ZNE with scale factors $\{1,3,5\}$ and linear or
+Richardson extrapolation through Mitiq.
+
+\subsection{Baselines}
+Noise-free training and evaluation (upper bound); noisy evaluation without mitigation; readout-error
+mitigation alone.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Test accuracy; mean absolute error of $\langle Z\rangle$ against noise-free values.
+  \item Signal magnitude $\E|\langle Z\rangle|$ as a function of depth and noise.
+  \item Number of circuit executions (shot overhead) per prediction.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Noise sweep & $p_2\in[0,0.05]$, no mitigation & accuracy, signal \\
+  E2 & ZNE & linear vs Richardson, scale factors & error, overhead \\
+  E3 & Training regimes & train clean/noisy, test noisy $\pm$ ZNE & accuracy \\
+  E4 & Readout mitigation & on/off & error \\
+  E5 & Depth & $L=1..5$ under noise & accuracy, signal \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/noise-aware-training-zne/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/noise-aware-training-zne/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "zne-vqc"
+title = "ZNE for the Module 5 classifier under depolarizing noise"
+script = "experiments/e01_zne_vqc.py"
+figure = "zne_accuracy.png"
+
+[experiments.params]
+noise_p1 = 0.001
+noise_p2 = 0.01
+scale_factors = "1,3,5"
+extrapolation = "richardson"
+shots = 2000
+n_layers = 3
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/noise-aware-training-zne
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_zne_vqc.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Report shot overhead next to every mitigated result; mitigation is never free.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Probabilistic error cancellation and other mitigation methods \citep{cai2023}.
+  \item Noise-aware circuit design: fewer two-qubit gates, hardware-native layouts.
+  \item The same study on real hardware (Project 16).
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item ZNE increases variance; small shot budgets can make results worse than unmitigated ones.
+  \item Extrapolation assumes a smooth noise response; non-Markovian device noise can break it.
+  \item Accuracy alone can hide large biases in expectation values.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

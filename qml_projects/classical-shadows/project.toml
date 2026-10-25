@@ -1,0 +1,7 @@
+number = 13
+title = "Learning from classical shadows"
+track = "quantum_data"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "hard"  # easy | medium | hard
+tools = "PennyLane"
+builds_on = [2, 8]  # module numbers
+summary = "Predict state properties from randomised measurements and compare with full tomography."

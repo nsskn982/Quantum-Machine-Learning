@@ -1,0 +1,222 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 05: QAOA for MaxCut with Learned Initial Angles
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 05: QAOA learned angles}
+
+\hypersetup{pdftitle={QML Lab project 05: QAOA for MaxCut with Learned Initial Angles}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 05}}\\[0.5em]
+  {\LARGE\bfseries QAOA for MaxCut with Learned Initial Angles}\\[0.6em]
+  {\large Predicting good QAOA parameters from graph features to cut optimisation cost.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \QC\ (quantum data or quantum algorithm, classical learner) & Track & Variational \\
+Difficulty & Medium & Tools & PennyLane, NetworkX, scikit-learn \\
+Builds on & Modules 3 and 5 of the QML Lab & Workspace & \path{qml_projects/qaoa-maxcut-learned-init/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+The Quantum Approximate Optimization Algorithm (QAOA) solves combinatorial problems such as MaxCut
+with a short parameterised circuit, but finding good angles costs many circuit evaluations. Optimal
+angles are known to concentrate across similar graphs. This project trains a classical model that
+maps simple graph features to good starting angles, and measures how many optimisation steps that
+saves. The learner is classical and learns about a quantum algorithm, so the project sits on the
+\QC\ side of the taxonomy.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{MaxCut}
+For a graph $G=(V,E)$, MaxCut asks for a split of the vertices into two sets that cuts as many edges
+as possible. With spins $z_i\in\{-1,+1\}$ the cost is
+\begin{equation}
+  C(z)=\sum_{(i,j)\in E}\frac{1-z_iz_j}{2}.
+\end{equation}
+The problem is NP-hard; the classical Goemans--Williamson algorithm guarantees a ratio of about
+0.878 of the optimum \citep{goemans1995}.
+
+\subsection{QAOA}
+QAOA \citep{farhi2014} prepares
+\begin{equation}
+  \ket{\gamma,\beta}=\prod_{l=1}^{p}e^{-i\beta_lB}\,e^{-i\gamma_lC}\ket{+}^{\otimes n},
+  \qquad B=\sum_jX_j,
+\end{equation}
+and maximises $F_p(\gamma,\beta)=\braket{\gamma,\beta|C|\gamma,\beta}$ with a classical optimiser. Quality
+is measured by the approximation ratio $r=F_p/C_{\max}$. The landscape has many local optima, so
+initial angles matter.
+
+\subsection{Angle concentration and transfer}
+\citet{brandao2018} showed that for fixed angles the QAOA objective concentrates over typical
+instances of a graph family, so good angles for one graph are good for similar graphs.
+\citet{zhou2020} found smooth patterns in optimal angles across depths and used them to build
+initialisations for larger $p$. \citet{egger2021} warm-start QAOA from a classical relaxation. Learning
+a map from graph features to angles generalises these ideas with data.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item Which graph features (size, density, degree statistics, clustering) predict good angles?
+  \item Do angles learned on 6--8-node graphs transfer to 10--12-node graphs?
+  \item How much do predicted angles reduce optimiser steps compared with random and with fixed mean angles?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+Random graphs generated with NetworkX \citep{hagberg2008}: 3-regular graphs and Erd\H{o}s--R\'enyi
+graphs with $p_{\text{edge}}\in\{0.3,0.5\}$, 6 to 12 nodes. For each graph, the best angles for depth
+$p=1,2$ are found by optimisation from 20 random restarts; these are the regression targets. Angles
+are mapped to a canonical range to remove symmetries before training.
+
+\subsection{Models}
+Regressors from graph features to $(\gamma,\beta)$: ridge regression, random forest and a small MLP.
+QAOA itself is simulated exactly with PennyLane; optimisation of the angles uses Adam or COBYLA with a
+fixed step budget.
+
+\subsection{Baselines}
+Random initial angles; fixed angles equal to the mean of the training targets (pure concentration);
+the INTERP heuristic of \citet{zhou2020} for $p>1$; Goemans--Williamson for the cut quality reference.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Approximation ratio at initialisation and after $K$ optimiser steps.
+  \item Steps needed to reach 95\,\% of the best-known ratio.
+  \item Angle prediction error on held-out graphs.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Data set & graph family, $n=6..10$, $p=1$ & target quality \\
+  E2 & Regressors & ridge, forest, MLP & init ratio, steps saved \\
+  E3 & Size transfer & train $n\le8$, test $n=10,12$ & init ratio \\
+  E4 & Deeper QAOA & $p=2,3$ & steps saved vs INTERP \\
+  E5 & Graph families & regular vs Erd\H{o}s--R\'enyi & transfer across families \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/qaoa-maxcut-learned-init/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/qaoa-maxcut-learned-init/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "learned-init"
+title = "Learned initial angles for depth-1 QAOA"
+script = "experiments/e01_learned_init.py"
+figure = "steps_saved.png"
+
+[experiments.params]
+n_nodes = 8
+graph_type = "regular3"
+depth_p = 1
+n_graphs = 200
+restarts = 20
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/qaoa-maxcut-learned-init
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_learned_init.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Report the classical Goemans--Williamson ratio next to every QAOA result.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Graph neural networks as the angle predictor.
+  \item Weighted MaxCut and other QUBO problems.
+  \item Warm-starting from classical relaxations \citep{egger2021}.
+  \item Run predicted-angle QAOA on hardware (Project 16).
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item Angle symmetries make targets ambiguous unless they are canonicalised.
+  \item Small graphs are easy classically; the study is about optimisation cost, not about beating classical solvers.
+  \item Generating targets needs many simulations; keep graphs small at first.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

@@ -1,0 +1,7 @@
+number = 6
+title = "Quantum autoencoder"
+track = "variational"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "medium"  # easy | medium | hard
+tools = "PennyLane"
+builds_on = [2, 5]  # module numbers
+summary = "Compress 3-qubit states into 2 qubits and measure reconstruction fidelity."

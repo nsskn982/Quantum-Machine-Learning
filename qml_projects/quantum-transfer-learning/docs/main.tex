@@ -1,0 +1,210 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 09: Quantum Transfer Learning
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 09: Quantum Transfer Learning}
+
+\hypersetup{pdftitle={QML Lab project 09: Quantum Transfer Learning}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 09}}\\[0.5em]
+  {\LARGE\bfseries Quantum Transfer Learning}\\[0.6em]
+  {\large A pretrained ResNet as feature extractor and a small quantum circuit as the classifier head.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Hybrid \\
+Difficulty & Easy & Tools & PennyLane, PyTorch, torchvision \\
+Builds on & Module 7 of the QML Lab & Workspace & \path{qml_projects/quantum-transfer-learning/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+Transfer learning reuses a network trained on a large data set and retrains only a small final part
+for a new task. Here the reused part is a pretrained ResNet-18 and the retrained part is a
+``dressed'' quantum circuit: a classical layer, a 4-qubit variational circuit and another classical
+layer. The project measures whether the quantum head matches classical heads of the same size, and
+how the result depends on qubit count and on the data set.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Transfer learning}
+Deep convolutional networks such as ResNet-18 \citep{he2016} learn general visual features on
+ImageNet. Removing the final layer leaves a frozen feature extractor that maps an image to a vector
+$z\in\R^{512}$. Training only a new head on $z$ works well even with a few hundred labelled images.
+
+\subsection{Dressed quantum circuits}
+\citet{mari2020} proposed classical-to-quantum transfer learning with a head of the form
+\begin{equation}
+  \hat y=W_{\text{out}}\;\big\langle Z\big\rangle_\theta\!\Big(\tfrac{\pi}{2}\tanh\big(W_{\text{in}}z\big)\Big),
+\end{equation}
+where $W_{\text{in}}\in\R^{n\times512}$ reduces the features to $n$ angles, the variational circuit
+returns one $\langle Z\rangle$ per qubit, and $W_{\text{out}}$ maps them to class scores. Only the head is
+trained, with PyTorch \citep{paszke2019}.
+
+\subsection{What a fair comparison looks like}
+The backbone does most of the work, so the comparison must hold everything else fixed: the same
+frozen features, the same training budget, and classical heads with a similar number of parameters
+(for example $512\to n\to2$ with a nonlinearity in place of the circuit).
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item Does the quantum head match a classical head with the same number of parameters?
+  \item How does accuracy change with 2, 4 and 6 qubits and with circuit depth?
+  \item How much does the $512\to n$ reduction layer matter compared with the circuit itself?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+The two-class ants/bees image set used by \citet{mari2020} (a few hundred images), then a two-class
+subset of CIFAR-10. Standard ImageNet normalisation and light augmentation; fixed train/validation
+splits per seed.
+
+\subsection{Models}
+Frozen ResNet-18 from torchvision; dressed quantum circuit with $n=4$ qubits, Hadamard layer,
+angle encoding and depth 6 of $R_Y$ rotations and CNOT chains; cross-entropy, Adam, 15 epochs,
+batch size 4.
+
+\subsection{Baselines}
+Linear head $512\to2$; MLP head $512\to n\to2$ with $\tanh$ (same parameter count as the dressed
+circuit apart from the circuit angles); fine-tuning the whole network as an upper bound.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Validation accuracy (mean $\pm$ s.d. over seeds).
+  \item Number of trainable head parameters; training time per epoch.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Quantum vs classical head & head type, $n=4$ & accuracy \\
+  E2 & Qubit sweep & $n\in\{2,4,6\}$ & accuracy \\
+  E3 & Circuit depth & depth $1..8$ & accuracy, time \\
+  E4 & Noise & noisy simulator at inference & accuracy drop \\
+  E5 & Second data set & CIFAR-10 pair & accuracy \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/quantum-transfer-learning/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/quantum-transfer-learning/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "ants-bees"
+title = "Dressed quantum head on ResNet-18 features"
+script = "experiments/e01_ants_bees.py"
+figure = "head_comparison.png"
+
+[experiments.params]
+n_qubits = 4
+q_depth = 6
+epochs = 15
+lr = 0.0004
+batch_size = 4
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/quantum-transfer-learning
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_ants_bees.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Compare heads only on identical frozen features; report head parameter counts.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Quantum-to-classical transfer: a pretrained quantum feature extractor with a classical head.
+  \item Inference of the trained head on real hardware (Project 16).
+  \item Other backbones (MobileNet, vision transformers).
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item The backbone dominates; small differences between heads may be noise.
+  \item Tiny data sets give high variance; use several seeds.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

@@ -1,0 +1,212 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 06: Quantum Autoencoder
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 06: Quantum Autoencoder}
+
+\hypersetup{pdftitle={QML Lab project 06: Quantum Autoencoder}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 06}}\\[0.5em]
+  {\LARGE\bfseries Quantum Autoencoder}\\[0.6em]
+  {\large Compressing quantum states into fewer qubits and recovering them.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \QQ\ (quantum data, quantum processor) & Track & Variational \\
+Difficulty & Medium & Tools & PennyLane \\
+Builds on & Modules 2 and 5 of the QML Lab & Workspace & \path{qml_projects/quantum-autoencoder/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+A quantum autoencoder learns a unitary that squeezes a family of quantum states into fewer qubits,
+so that the discarded qubits always end up in a fixed reference state. Because the inputs and the
+processing are both quantum, this is a \QQ\ project. It studies which state families compress, how
+far, and how robust the trained encoder is to noise.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Compression of quantum data}
+Let $\{\ket{\psi_i}\}$ be a family of $n$-qubit states, for example ground states of a Hamiltonian at
+different couplings. If all of them lie in a subspace of dimension at most $2^{n_A}$, a unitary $U$ can
+map them onto $n_A$ ``latent'' qubits, leaving $n_B=n-n_A$ ``trash'' qubits in $\ket{0}$. Decoding
+applies $U^\dagger$ after resetting the trash qubits \citep{romero2017}.
+
+\subsection{Training objective}
+For a parameterised encoder $U(\theta)$, the trash fidelity of state $\psi_i$ is
+\begin{equation}
+  F_i(\theta)=\Tr\!\Big[\big(I_A\otimes\ket{0}\!\bra{0}_B\big)\,U(\theta)\ket{\psi_i}\!\bra{\psi_i}U(\theta)^\dagger\Big],
+\end{equation}
+and training minimises $C(\theta)=1-\frac1N\sum_iF_i(\theta)$. If $C=0$, decoding reproduces every state
+exactly. On hardware, overlaps such as this are often measured with the swap test
+\citep{buhrman2001}, which returns 0 with probability $\tfrac12\big(1+|\braket{a|b}|^2\big)$.
+\citet{pepper2019} realised a quantum autoencoder experimentally with photonic qutrits.
+
+\subsection{Why this is QQ}
+The encoder acts on quantum states directly, without measuring them. In simulation the input states
+are prepared classically, which hides the real use case: compressing the output of a quantum
+simulation or a quantum sensor before storing or transmitting it.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item Which state families compress well (Ising ground states, GHZ-like, W-like, Haar-random)?
+  \item How does reconstruction fidelity fall when compressing further (3 to 2 versus 3 to 1 qubits)?
+  \item How sensitive is a trained encoder to depolarizing noise?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+State families on 3--4 qubits: ground states of the transverse-field Ising model for a range of field
+strengths (shared with Project 12), GHZ states with varying relative phase, W-like states, and
+Haar-random states as a negative control. Separate training and test states from each family.
+
+\subsection{Models}
+Hardware-efficient encoder with $L$ layers of $R_Y$/$R_Z$ rotations and CNOT rings on all qubits;
+cost from exact trash-qubit probabilities, and later from finite-shot swap tests; Adam optimiser.
+
+\subsection{Baselines}
+Classical reference: the rank of the state family's density matrix, which bounds the best possible
+compression; Haar-random states, which should not compress.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Trash fidelity and reconstruction fidelity on test states.
+  \item Compression ratio $n_A/n$.
+  \item Fidelity under depolarizing noise $p$.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & 3 to 2 qubits & Ising family & test reconstruction fidelity \\
+  E2 & 3 to 1 qubit & Ising and GHZ families & fidelity drop \\
+  E3 & Negative control & Haar-random states & fidelity vs rank bound \\
+  E4 & Noise & depolarizing $p\in[0,0.05]$ & fidelity \\
+  E5 & Swap-test cost & shots $M$ & training stability \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/quantum-autoencoder/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/quantum-autoencoder/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "compress-ising"
+title = "Compress Ising ground states from 3 to 2 qubits"
+script = "experiments/e01_compress_ising.py"
+figure = "fidelity.png"
+
+[experiments.params]
+n_qubits = 3
+n_trash = 1
+n_layers = 3
+steps = 200
+family = "ising"
+noise = 0.0
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/quantum-autoencoder
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_compress_ising.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Always compare achieved fidelity with the rank bound of the state family.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Denoising autoencoders that remove noise from quantum states.
+  \item Compress Ising states before feeding them to a QCNN (Project 12).
+  \item Run a small encoder on hardware with a swap-test cost.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item Simulation prepares inputs classically, so the practical advantage of \QQ\ processing is not visible.
+  \item Deeper encoders on more qubits may hit barren plateaus.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

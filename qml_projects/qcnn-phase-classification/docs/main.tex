@@ -1,0 +1,216 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 12: QCNN for Phase Classification
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 12: QCNN for Phase Classification}
+
+\hypersetup{pdftitle={QML Lab project 12: QCNN for Phase Classification}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 12}}\\[0.5em]
+  {\LARGE\bfseries QCNN for Phase Classification}\\[0.6em]
+  {\large Recognising the phases of the transverse-field Ising model directly from quantum states.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \QQ\ (quantum data, quantum processor) & Track & Quantum data \\
+Difficulty & Hard & Tools & PennyLane, SciPy \\
+Builds on & Modules 5 and 8 of the QML Lab & Workspace & \path{qml_projects/qcnn-phase-classification/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+A quantum convolutional neural network (QCNN) processes a many-body quantum state with layers of
+local unitaries and pooling, much like a convolutional network processes an image. Its input is the
+quantum state itself, which makes this the lab's main \QQ\ project. The QCNN learns to tell the
+ordered from the disordered phase of the transverse-field Ising chain, and is compared with classical
+learners that only see measurement snapshots.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{The transverse-field Ising model}
+The chain of $N$ spins with Hamiltonian
+\begin{equation}
+  H=-J\sum_{i=1}^{N-1}Z_iZ_{i+1}-h\sum_{i=1}^{N}X_i
+\end{equation}
+has a quantum phase transition at $h=J$ in the thermodynamic limit \citep{pfeuty1970,sachdev2011}:
+for $h<J$ the ground state is ferromagnetically ordered, for $h>J$ it is paramagnetic. In finite
+chains the transition is smoothed and shifted, which a classifier must cope with.
+
+\subsection{Quantum convolutional neural networks}
+\citet{cong2019} introduced the QCNN. A \emph{convolution} layer applies the same two-qubit unitary to
+neighbouring pairs; a \emph{pooling} layer measures (or traces out) half of the qubits and applies
+conditioned rotations to their neighbours; after $O(\log N)$ rounds a final unitary acts on the
+remaining qubit, whose $\langle Z\rangle$ gives the phase. The network has only $O(\log N)$ parameters.
+\citet{pesah2021} proved that QCNNs do not suffer from barren plateaus, and \citet{herrmann2022}
+ran a QCNN on a superconducting processor to recognise a symmetry-protected phase.
+
+\subsection{Quantum versus classical learners}
+A classical learner, as in \citet{carrasquilla2017}, must work from measurement snapshots, losing
+phase information at every measurement. The QCNN acts on the state before measurement. Comparing both
+with the same number of state copies is the core of the \QQ\ question.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item How close to the critical point $h=J$ does the QCNN classify correctly, and how does that change with $N$?
+  \item Do QCNN gradients stay large as the chain grows, as theory predicts?
+  \item How many state copies does the QCNN need compared with a classical model trained on measurement snapshots?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+Ground states of the Ising chain for $N=4$ and 8 (later 12) computed by exact diagonalisation with
+SciPy sparse methods, for $h/J$ from 0.1 to 2.0. Training uses states away from the transition
+($h<0.8$ and $h>1.2$); testing covers the full range.
+
+\subsection{Models}
+QCNN with parameterised two-qubit convolution blocks, pooling by controlled rotations and a final
+single-qubit readout; binary cross-entropy on the phase label; Adam. Input states are loaded exactly
+with \texttt{StatePrep} in simulation.
+
+\subsection{Baselines}
+Logistic regression on two-point correlations $\langle Z_iZ_j\rangle$ (an order-parameter-like
+feature); an MLP on computational-basis snapshots, as in \citet{carrasquilla2017}; an unstructured
+hardware-efficient classifier with the same parameter count.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Accuracy far from and near the transition; predicted transition point $h^*$ where $p=0.5$.
+  \item Gradient variance versus $N$.
+  \item Number of state copies or shots to reach a given accuracy.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Small chain & $N=4$ & accuracy, $h^*$ \\
+  E2 & Larger chain & $N=8$ (then 12) & accuracy, $h^*$ \\
+  E3 & Near criticality & test $h\in[0.8,1.2]$ & accuracy \\
+  E4 & Copies & shots per state & accuracy vs snapshot MLP \\
+  E5 & Trainability & QCNN vs unstructured ansatz & gradient variance \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/qcnn-phase-classification/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/qcnn-phase-classification/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "ising-phases"
+title = "QCNN on transverse-field Ising ground states"
+script = "experiments/e01_ising_phases.py"
+figure = "phase_prediction.png"
+
+[experiments.params]
+n_spins = 8
+h_min = 0.1
+h_max = 2.0
+n_train = 40
+epochs = 100
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/qcnn-phase-classification
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_ising_phases.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Compare quantum and classical learners at an equal number of state copies.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item The symmetry-protected topological phase of the cluster-Ising model, the original QCNN task.
+  \item Inputs compressed by the quantum autoencoder (Project 06).
+  \item Classical shadows as the classical learner's input (Project 13).
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item In simulation the exact state is free; the cost of preparing it on hardware is the real bottleneck.
+  \item Finite-size effects shift $h^*$ away from 1; this is physics, not a bug.
+  \item Training sets are small; regularise and use several seeds.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

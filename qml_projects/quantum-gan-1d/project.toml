@@ -1,0 +1,7 @@
+number = 7
+title = "Quantum GAN for a 1-D distribution"
+track = "variational"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "hard"  # easy | medium | hard
+tools = "Qiskit ML, PyTorch"
+builds_on = [5, 7]  # module numbers
+summary = "Train a quantum generator to sample a log-normal distribution against a classical discriminator."

@@ -1,0 +1,7 @@
+number = 10
+title = "Quantum reinforcement learning on CartPole"
+track = "hybrid"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "hard"  # easy | medium | hard
+tools = "PennyLane, Gymnasium"
+builds_on = [5, 7]  # module numbers
+summary = "Use a variational circuit as the policy network in a REINFORCE agent."

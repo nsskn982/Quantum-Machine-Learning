@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Run {{ run.pk }}{% endblock %}
+{% block extra_head %}{% if run.active %}<meta http-equiv="refresh" content="3">{% endif %}{% endblock %}
+{% block content %}
+{% with target=run.target %}
+<nav class="crumbs">
+  {% if run.module %}<a href="{% url 'dashboard' %}">Modules</a> / <a href="{{ target.get_absolute_url }}">Module {{ target.number }}</a>
+  {% else %}<a href="{% url 'project_list' %}">Projects</a> / <a href="{{ target.project.get_absolute_url }}">{{ target.project.title }}</a>{% endif %}
+  / Run {{ run.pk }}
+</nav>
+<header class="page-head">
+  <h1>Run {{ run.pk }}: {% if run.module %}{{ target.script }}{% else %}{{ target.title }}{% endif %}</h1>
+  <p><span class="pill pill-{{ run.status }}">{{ run.get_status_display }}</span>
+    <span class="muted">by {{ run.user|default:"unknown" }} · {{ run.created|date:"j M Y, H:i" }}{% if run.duration %} · {{ run.duration|floatformat:1 }} s{% endif %}</span></p>
+  {% if run.active %}<p class="muted small">This page refreshes every 3 seconds until the script finishes.</p>{% endif %}
+</header>
+
+{% if run.error_kind %}
+<div class="callout callout-error" role="alert">
+  <strong>{{ run.get_error_kind_display }}.</strong> {{ error_help }}
+</div>
+{% endif %}
+
+<div class="two-col">
+  <div class="main-col">
+    {% for fig in run.figures.all %}
+    <figure class="figure">
+      <img src="{{ fig.file.url }}" alt="{{ fig.name }}">
+      <figcaption>{{ fig.name }}{% if fig.primary and run.module %} · {{ target.figure_caption }}{% endif %}</figcaption>
+    </figure>
+    {% endfor %}
+    <h2>Output</h2>
+    {% if run.output %}<pre class="code"><code>{{ run.output }}</code></pre>
+    {% else %}<p class="empty">{% if run.active %}Waiting for output…{% else %}The script printed nothing.{% endif %}</p>{% endif %}
+  </div>
+  <aside class="side-col">
+    <section class="panel">
+      <h2>Parameters</h2>
+      {% if run.params %}<dl class="facts">{% for k, v in run.params.items %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl>
+      {% else %}<p class="muted small">Defaults (this script takes no parameters).</p>{% endif %}
+    </section>
+    <section class="panel">
+      <h2>Metrics</h2>
+      {% if run.metrics %}<dl class="facts">{% for k, v in run.metrics.items %}<dt>{{ k }}</dt><dd class="num">{{ v|floatformat:4 }}</dd>{% endfor %}</dl>
+      {% else %}<p class="muted small">None recorded. Scripts call log_metrics() to add them.</p>{% endif %}
+    </section>
+    <p><a href="{{ target.get_absolute_url }}">Back to {% if run.module %}Module {{ target.number }}{% else %}the project{% endif %}</a></p>
+  </aside>
+</div>
+{% endwith %}
+{% endblock %}

@@ -1,0 +1,222 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 11: Quantum Reservoir Computing for Time Series
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 11: Quantum reservoir computing}
+
+\hypersetup{pdftitle={QML Lab project 11: Quantum Reservoir Computing for Time Series}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 11}}\\[0.5em]
+  {\LARGE\bfseries Quantum Reservoir Computing for Time Series}\\[0.6em]
+  {\large A fixed random quantum system as a reservoir, with only a linear read-out trained.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Hybrid \\
+Difficulty & Medium & Tools & PennyLane, scikit-learn \\
+Builds on & Modules 2 and 4 of the QML Lab & Workspace & \path{qml_projects/quantum-reservoir-time-series/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+Reservoir computing avoids training the hard part of a recurrent model: a fixed dynamical system
+mixes the input history, and only a linear read-out is fitted. This project uses a small, fixed
+quantum circuit as the reservoir, feeds a time series into it step by step, and forecasts the series
+from measured expectation values. It compares the quantum reservoir with a classical echo-state network
+of the same size on standard forecasting and memory tasks.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Reservoir computing}
+An echo-state network \citep{jaeger2004} drives a fixed random recurrent network with the input
+$u_t$ and fits only the output weights. With features $x_t\in\R^m$ collected in a matrix $X$ and
+targets $Y$, the read-out is ridge regression,
+\begin{equation}
+  W=YX^\top\big(XX^\top+\lambda I\big)^{-1},\qquad \hat y_t=Wx_t ,
+\end{equation}
+which trains in closed form. The reservoir needs \emph{fading memory}: recent inputs must matter more
+than old ones.
+
+\subsection{Quantum reservoirs}
+\citet{fujii2017} proposed quantum reservoirs: the input is injected into one qubit at every step,
+the system evolves under a fixed Hamiltonian, and expectation values form the features. In a circuit
+version,
+\begin{equation}
+  \rho_{t+1}=\mathcal{U}\Big(\ket{u_t}\!\bra{u_t}\otimes\Tr_1[\rho_t]\Big)\,\mathcal{U}^\dagger,\qquad
+  x_t=\big(\langle Z_i\rangle_t,\ \langle Z_iZ_j\rangle_t\big)_{i<j},
+\end{equation}
+where $\ket{u_t}=R_Y(u_t)\ket{0}$ replaces qubit 1 at each step (the partial reset gives fading
+memory). The exponentially large state space promises rich dynamics from few qubits; the review of
+\citet{mujal2021} discusses the opportunities and the cost of measurement.
+
+\subsection{Benchmarks}
+The Mackey--Glass system \citep{mackey1977},
+$\dot x(t)=\beta\,x(t-\tau)/\big(1+x(t-\tau)^{10}\big)-\gamma x(t)$ with $\beta=0.2$, $\gamma=0.1$ and
+$\tau=17$, is chaotic and a standard forecasting test. Memory capacity
+$\mathrm{MC}=\sum_{d\ge1}r^2\big(u_{t-d},\hat y^{(d)}_t\big)$ measures how many past inputs the
+reservoir can reconstruct.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item How does forecast error depend on reservoir size and on which observables are measured?
+  \item Does memory of past inputs fade too fast or too slowly, and how can the reset strength tune it?
+  \item How does the quantum reservoir compare with a classical echo-state network with the same number of features?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+A noisy sine wave (sanity check), the Mackey--Glass series sampled at unit time steps, and
+i.i.d.\ uniform inputs for memory capacity. 100 washout steps, 1000 training steps, 500 test steps.
+
+\subsection{Models}
+$n=4$--$8$ qubits simulated as density matrices (\texttt{default.mixed}); fixed random rotations and
+CNOTs as $\mathcal U$; input injection by reset and $R_Y(u_t)$ on qubit 1; single- and two-qubit $Z$
+expectation values as features (exact, then from $M$ shots); ridge read-out.
+
+\subsection{Baselines}
+Echo-state network with the same number of read-out features; linear autoregressive model; a small
+LSTM as a strong upper reference.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Normalised root mean squared error (NRMSE) on test data.
+  \item Memory capacity curve $r^2$ versus delay $d$.
+  \item Robustness to the number of shots $M$.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Sine forecast & reservoir size $n$ & NRMSE \\
+  E2 & Mackey--Glass & quantum vs echo-state network & NRMSE one- and multi-step \\
+  E3 & Features & single vs two-qubit observables & NRMSE \\
+  E4 & Memory & delay $d=1..20$ & memory capacity \\
+  E5 & Shot noise & $M\in\{100,1000,10^4\}$ & NRMSE \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/quantum-reservoir-time-series/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/quantum-reservoir-time-series/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "mackey-glass"
+title = "Quantum reservoir forecast of Mackey--Glass"
+script = "experiments/e01_mackey_glass.py"
+figure = "forecast.png"
+
+[experiments.params]
+n_qubits = 6
+washout = 100
+train_steps = 1000
+ridge = 1e-06
+shots = 0
+task = "mackey_glass"
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/quantum-reservoir-time-series
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_mackey_glass.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Give the echo-state network exactly as many read-out features as the quantum reservoir.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Closed-loop (generative) forecasting with feedback.
+  \item Quantum extreme learning machines, which drop the memory and process one input at a time.
+  \item Hardware with mid-circuit measurement and reset.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item On hardware, measuring destroys the reservoir state; each time step may require re-running the input history.
+  \item For $n\le8$ qubits the reservoir is easy to simulate classically; any advantage must come from scaling.
+  \item Results depend strongly on reservoir and ridge hyperparameters.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

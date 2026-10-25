@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Projects{% endblock %}
+{% block content %}
+<header class="page-head row-between">
+  <div>
+    <h1>QML project board</h1>
+    <p class="lede">Open-ended projects to take further after the modules. Join one to run its experiments and write in its journal.</p>
+  </div>
+  <a class="btn" href="{% url 'project_create' %}">Add a project idea</a>
+</header>
+
+<form method="get" class="filters" aria-label="Filter projects">
+  <label for="q" class="sr-only">Search</label>
+  <input id="q" type="search" name="q" value="{{ query }}" placeholder="Search title, summary, tools" maxlength="100">
+  {% for f in filters %}
+    <label for="f-{{ f.name }}" class="sr-only">{{ f.label }}</label>
+    <select id="f-{{ f.name }}" name="{{ f.name }}">
+      <option value="">{% if f.name == "status" %}Any status except archived{% else %}Any {{ f.label|lower }}{% endif %}</option>
+      {% for value, label in f.choices %}<option value="{{ value }}" {% if value == f.value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  {% endfor %}
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  {% if filtered %}<a href="{% url 'project_list' %}">Clear</a>{% endif %}
+</form>
+
+<div class="table-scroll">
+<table class="board">
+  <thead>
+    <tr><th>#</th><th>Project</th><th>Track</th><th>Difficulty</th><th>Builds on</th><th>People</th><th>Runs</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+  {% for p in projects %}
+    <tr>
+      <td class="num">{{ p.number|default:"–" }}</td>
+      <td><a href="{{ p.get_absolute_url }}"><strong>{{ p.title }}</strong></a><div class="muted small">{{ p.summary }}</div><div class="muted small">{{ p.tools }}</div></td>
+      <td>{{ p.get_track_display }}</td>
+      <td><span class="diff diff-{{ p.difficulty }}">{{ p.get_difficulty_display }}</span></td>
+      <td class="small">{% for m in p.builds_on.all %}<a href="{{ m.get_absolute_url }}">M{{ m.number }}</a>{% if not forloop.last %}, {% endif %}{% empty %}–{% endfor %}</td>
+      <td class="num">{{ p.member_count }}{% if p.lead %}<div class="muted small">lead {{ p.lead }}</div>{% endif %}</td>
+      <td class="num">{{ p.run_count }}</td>
+      <td><span class="pill pill-{{ p.status }}">{{ p.get_status_display }}</span></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="8" class="empty">{% if filtered %}No projects match these filters.{% else %}No projects yet. Run <code>python manage.py seed_portal</code>.{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

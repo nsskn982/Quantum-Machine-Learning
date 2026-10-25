@@ -1,0 +1,86 @@
+% ---------------------------------------------------------------------------
+%  qmlproject.sty -- shared look for the QML Lab documents
+%  Harvard (author-date) citations: natbib + harvardqml.bst
+%    \citep{key}   -> (Author, 2020)        \citet{key}   -> Author (2020)
+%    \citeyearpar{key} -> (2020)            \citealp{key} -> Author, 2020
+% ---------------------------------------------------------------------------
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{qmlproject}[2026/10/25 QML Lab document style]
+
+\RequirePackage[T1]{fontenc}
+\RequirePackage[utf8]{inputenc}
+% Palatino + Helvetica (always available). Swap for \RequirePackage{lmodern} if you prefer.
+\RequirePackage[sc]{mathpazo}
+\RequirePackage[scaled=0.92]{helvet}
+\RequirePackage{microtype}
+\RequirePackage[margin=2.5cm,headheight=14pt]{geometry}
+\RequirePackage{amsmath,amssymb}
+\RequirePackage{braket}
+\RequirePackage{booktabs,tabularx,array}
+\RequirePackage{enumitem}
+\RequirePackage[dvipsnames]{xcolor}
+\RequirePackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{listings}
+\RequirePackage{fancyhdr}
+\PassOptionsToPackage{hyphens}{url}
+\RequirePackage[round,authoryear]{natbib}
+\RequirePackage[colorlinks=true,linkcolor=MidnightBlue,citecolor=MidnightBlue,urlcolor=MidnightBlue]{hyperref}
+\RequirePackage[nameinlink]{cleveref}
+
+% --- layout ------------------------------------------------------------------
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+\setlist{itemsep=0.2em,topsep=0.3em}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\bibsep}{0.35em}
+\setlength{\bibhang}{1.5em}
+\urlstyle{same}
+\setlength{\emergencystretch}{1.5em}
+
+% --- quadrant colours and tags ---------------------------------------------------
+\definecolor{ccC}{HTML}{6B7280}
+\definecolor{cqC}{HTML}{1F5FBF}
+\definecolor{qcC}{HTML}{0F7B6C}
+\definecolor{qqC}{HTML}{8E3FB0}
+\newcommand{\qtag}[2]{\textcolor{#1}{\textbf{#2}}}
+\newcommand{\CC}{\qtag{ccC}{CC}}
+\newcommand{\CQ}{\qtag{cqC}{CQ}}
+\newcommand{\QC}{\qtag{qcC}{QC}}
+\newcommand{\QQ}{\qtag{qqC}{QQ}}
+
+% --- maths shortcuts ------------------------------------------------------------
+\newcommand{\Tr}{\operatorname{Tr}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+
+% --- boxes -------------------------------------------------------------------------
+\newtcolorbox{inshort}[1][]{enhanced,breakable,colback=black!3,colframe=black!25,
+  boxrule=0.5pt,arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,
+  fonttitle=\bfseries\small,coltitle=black,colbacktitle=black!8,title={In short},#1}
+
+\newtcolorbox{projectcard}[1][]{enhanced,colback=cqC!4,colframe=cqC!60,boxrule=0.6pt,arc=2pt,
+  left=8pt,right=8pt,top=6pt,bottom=6pt,#1}
+
+% Research questions: \begin{rqlist} \item ... \end{rqlist}  ->  RQ1, RQ2, ...
+\newlist{rqlist}{enumerate}{1}
+\setlist[rqlist]{label=\textbf{RQ\arabic*},leftmargin=3em,itemsep=0.35em}
+\crefname{rqlisti}{RQ}{RQs}
+
+% --- code listings -------------------------------------------------------------
+\lstdefinestyle{qml}{basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true,
+  frame=single,framerule=0.4pt,rulecolor=\color{black!25},backgroundcolor=\color{black!3},
+  xleftmargin=4pt,xrightmargin=4pt,aboveskip=0.6em,belowskip=0.6em,
+  showstringspaces=false,breaklines=true,upquote=true}
+\lstset{style=qml}
+
+% --- running header ---------------------------------------------------------------
+\newcommand{\qmlheader}[1]{%
+  \pagestyle{fancy}\fancyhf{}%
+  \fancyhead[L]{\small\textcolor{black!55}{QML Lab}}%
+  \fancyhead[R]{\small\textcolor{black!55}{#1}}%
+  \fancyfoot[C]{\small\thepage}%
+  \renewcommand{\headrulewidth}{0.3pt}}
+
+\endinput

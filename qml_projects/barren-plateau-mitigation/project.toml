@@ -1,0 +1,7 @@
+number = 15
+title = "Barren-plateau mitigation"
+track = "noise_hardware"            # kernels | variational | hybrid | quantum_data | noise_hardware
+difficulty = "medium"  # easy | medium | hard
+tools = "PennyLane"
+builds_on = [8]  # module numbers
+summary = "Compare layerwise training, identity-block initialisation and local costs."

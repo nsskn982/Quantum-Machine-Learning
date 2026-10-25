@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Modules{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <h1>Quantum machine learning, one module at a time</h1>
+    <p class="muted">Eight modules over about ten weeks, from a single qubit to a hybrid classifier. Each one has a concept, a script you can run here, a figure and a checkpoint.</p>
+  </div>
+  <div class="meter" aria-label="{{ done }} of {{ total }} checkpoints passed">
+    <div class="meter-num">{{ done }}<span>/{{ total }}</span></div>
+    <div class="meter-bar"><span style="width: {{ percent }}%"></span></div>
+    <div class="muted small">checkpoints passed</div>
+    {% if next_row %}<a class="btn" href="{{ next_row.module.get_absolute_url }}">Continue: Module {{ next_row.module.number }}</a>{% endif %}
+  </div>
+</section>
+
+{% if not rows %}
+  <p class="empty">No modules yet. Run <code>python manage.py seed_portal</code> to load them.</p>
+{% else %}
+<ol class="modules">
+  {% for row in rows %}
+  <li class="module-card status-{{ row.status }}">
+    <a href="{{ row.module.get_absolute_url }}" class="module-link">
+      <div class="module-thumb">
+        {% if row.run and row.run.primary_figure %}<img src="{{ row.run.primary_figure.file.url }}" alt="Latest figure for module {{ row.module.number }}" loading="lazy">
+        {% else %}<span class="thumb-empty">M{{ row.module.number }}</span>{% endif %}
+      </div>
+      <div class="module-body">
+        <div class="eyebrow">Module {{ row.module.number }} · week {{ row.module.week }} · {{ row.module.tool }}</div>
+        <h2>{{ row.module.title }}</h2>
+        <p class="muted">{{ row.module.summary }}</p>
+        <span class="pill pill-{{ row.status }}">
+          {% if row.status == "done" %}Checkpoint passed{% elif row.status == "in_progress" %}In progress{% else %}Not started{% endif %}
+        </span>
+      </div>
+    </a>
+  </li>
+  {% endfor %}
+</ol>
+{% endif %}
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Your projects</h2>
+    <a href="{% url 'project_list' %}">Browse all project ideas</a>
+  </div>
+  {% for p in my_projects %}
+    <p><a href="{{ p.get_absolute_url }}">{{ p.title }}</a> <span class="pill pill-{{ p.status }}">{{ p.get_status_display }}</span></p>
+  {% empty %}
+    <p class="muted">You haven't joined a project yet. Pick one from the project board once you've finished a few modules.</p>
+  {% endfor %}
+</section>
+{% endblock %}

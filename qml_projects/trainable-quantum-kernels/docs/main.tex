@@ -1,0 +1,222 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 02: Trainable Quantum Kernels
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 02: Trainable Quantum Kernels}
+
+\hypersetup{pdftitle={QML Lab project 02: Trainable Quantum Kernels}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 02}}\\[0.5em]
+  {\LARGE\bfseries Trainable Quantum Kernels}\\[0.6em]
+  {\large Learning a feature map whose kernel matches the labels, and measuring what that buys.}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Kernels \\
+Difficulty & Medium & Tools & PennyLane, scikit-learn \\
+Builds on & Modules 3 and 6 of the QML Lab & Workspace & \path{qml_projects/trainable-quantum-kernels/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+A fixed feature map is a guess about which data points should look similar. This project makes the
+feature map trainable and optimises it to maximise kernel--target alignment, a cheap proxy for how
+well an SVM will perform. The question is whether alignment training improves test accuracy over a
+fixed ZZ map and a tuned RBF kernel, and at what cost in circuit evaluations and overfitting.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Quantum embedding kernels}
+A quantum embedding kernel uses a parameterised feature map $\ket{\psi_\theta(x)}=U_\theta(x)\ket{0}$,
+\begin{equation}
+  \kappa_\theta(x,x')=|\braket{\psi_\theta(x)|\psi_\theta(x')}|^2 .
+\end{equation}
+With fixed $\theta$ this is an ordinary quantum kernel (Module 6). Training $\theta$ adapts the
+geometry of the feature space to the task. \citet{hubregtsen2022} studied this on near-term hardware,
+including the effect of noise on the kernel matrix.
+
+\subsection{Kernel--target alignment}
+Training a full SVM inside an optimisation loop is expensive. Kernel--target alignment
+\citep{cristianini2001} measures how close the Gram matrix $K$ is to the ideal kernel $yy^\top$ for
+labels $y\in\{-1,+1\}^N$:
+\begin{equation}
+  A(K,y)=\frac{\langle K,yy^\top\rangle_F}{\lVert K\rVert_F\,\lVert yy^\top\rVert_F}
+        =\frac{\sum_{ij}y_iy_jK_{ij}}{N\sqrt{\sum_{ij}K_{ij}^2}} .
+\end{equation}
+$A=1$ means same-class points are maximally similar and different-class points dissimilar.
+Gradients $\partial A/\partial\theta$ follow from parameter-shift gradients of each kernel entry
+(Module 3). Each step uses a random batch of $B$ points, so it costs $O(B^2)$ kernel evaluations
+rather than $O(N^2)$.
+
+\subsection{Inductive bias}
+\citet{kubler2021} show that quantum kernels generalise only if their inductive bias, the functions
+they find easy to represent, matches the task; very expressive embeddings spread their capacity
+over an exponentially large space and fail to generalise. Training the embedding is one way to
+create a useful bias, but it also adds parameters that can overfit.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item Does higher training alignment translate into higher test accuracy, and where does the correlation break down?
+  \item How many trainable parameters can the embedding have before the trained kernel overfits?
+  \item Can alignment be trained on a small subset (10--20\,\%) of the data and still transfer to the full training set?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+Two moons and concentric circles (scikit-learn) for intuition, then breast cancer (30 features,
+PCA to 4) and a two-class subset of Iris. Features are standardised and scaled to $[0,\pi]$.
+Every data set gets a fixed train/validation/test split per seed.
+
+\subsection{Models}
+A layered embedding on $n=4$ qubits: each layer applies angle encoding of $x$ (features repeated
+over qubits if $d<n$), trainable $R_Z$/$R_Y$ rotations and a ring of CNOTs. $\theta$ is trained by
+gradient ascent on the alignment of random batches ($B=8$--$16$); the final kernel matrix is then
+handed to a precomputed-kernel SVM.
+
+\subsection{Baselines}
+The same embedding with random, untrained $\theta$; the fixed ZZ feature map; and an RBF kernel whose
+width is also chosen by alignment, so that both sides get the same tuning method.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Training and test alignment; test accuracy of the SVM.
+  \item Number of kernel evaluations used for training.
+  \item Alignment and accuracy as a function of training steps (learning curves).
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Alignment training on two moons & training steps (0--300) & alignment, test accuracy \\
+  E2 & Embedding size & layers $L\in\{1,2,3,4\}$ & train/test gap \\
+  E3 & Batch size & $B\in\{4,8,16,32\}$ & alignment noise, cost \\
+  E4 & Real data & breast cancer, Iris & test accuracy vs RBF \\
+  E5 & Subset transfer & alignment trained on 10\% of data & test accuracy \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/trainable-quantum-kernels/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/trainable-quantum-kernels/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "alignment-moons"
+title = "Alignment-trained embedding kernel on two moons"
+script = "experiments/e01_alignment_moons.py"
+figure = "alignment.png"
+
+[experiments.params]
+n_qubits = 4
+n_layers = 2
+steps = 200
+batch = 10
+lr = 0.05
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/trainable-quantum-kernels
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_alignment_moons.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Choose hyperparameters on a validation split; never tune alignment on the test set.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Centred alignment, which is less sensitive to class imbalance.
+  \item Multi-class alignment with one-hot label kernels.
+  \item Effect of hardware noise on trained kernels, following \citet{hubregtsen2022}.
+  \item Compare alignment with the geometric difference of \citet{huang2021power} as a selection criterion.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item Alignment is a proxy: high alignment on training batches can coexist with poor test accuracy.
+  \item Each step costs $O(B^2)$ kernel evaluations, each needing parameter-shift gradients.
+  \item Too many embedding parameters overfit small data sets.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}

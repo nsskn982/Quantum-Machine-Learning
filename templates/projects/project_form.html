@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}New project idea{% endblock %}
+{% block content %}
+<nav class="crumbs"><a href="{% url 'project_list' %}">Projects</a> / New</nav>
+<section class="narrow">
+  <h1>Add a project idea</h1>
+  <p class="muted">You become its lead. To give it code and experiments, run <code>python manage.py new_project &lt;slug&gt;</code> afterwards.</p>
+  <form method="post" class="stack">
+    {% csrf_token %}
+    {{ form.as_div }}
+    <button class="btn" type="submit">Add project</button>
+  </form>
+</section>
+{% endblock %}

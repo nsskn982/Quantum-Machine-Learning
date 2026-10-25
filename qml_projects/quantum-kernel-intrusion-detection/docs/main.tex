@@ -1,0 +1,240 @@
+% ---------------------------------------------------------------------------
+%  QML Lab research project 01: Quantum-Kernel Intrusion Detection
+%  Build:  latexmk -pdf main.tex   (needs qmlproject.sty, harvardqml.bst, references.bib)
+% ---------------------------------------------------------------------------
+\documentclass[11pt,a4paper]{article}
+\usepackage{qmlproject}
+\qmlheader{Project 01: Quantum-kernel IDS}
+
+\hypersetup{pdftitle={QML Lab project 01: Quantum-Kernel Intrusion Detection}}
+
+\begin{document}
+
+\begin{center}
+  {\small\textcolor{black!55}{QML Lab \textbullet\ research project 01}}\\[0.5em]
+  {\LARGE\bfseries Quantum-Kernel Intrusion Detection}\\[0.6em]
+  {\large Can a quantum kernel separate normal from malicious network traffic better than a tuned classical kernel?}\\[0.6em]
+  {\small Living document \textbullet\ last updated \today}
+\end{center}
+
+\begin{projectcard}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\bfseries}l X >{\bfseries}l X@{}}
+Quadrant  & \CQ\ (classical data, quantum processor) & Track & Kernels \\
+Difficulty & Medium & Tools & Qiskit, scikit-learn \\
+Builds on & Modules 4 and 6 of the QML Lab & Workspace & \path{qml_projects/quantum-kernel-intrusion-detection/} \\
+\end{tabularx}
+\end{projectcard}
+
+\paragraph{Summary.}
+This project applies a quantum-kernel support vector machine to network intrusion detection, a
+security task with real, imbalanced data. Traffic records are reduced to a few features with PCA,
+encoded into qubits with a ZZ feature map, and classified with an SVM that uses the state overlap
+as its kernel. The comparison that matters is against an RBF kernel and a small neural network
+with the same features. Kernel bandwidth, the scaling of features before encoding, is treated as
+the main control knob, because it decides whether the quantum kernel generalises or simply memorises.
+
+% ===========================================================================
+\section{Background and key concepts}
+% ===========================================================================
+\subsection{Intrusion detection as classification}
+A network intrusion detection system labels connections or flows as normal or as one of several
+attack types. Public benchmarks make results comparable. NSL-KDD \citep{tavallaee2009} removes the
+duplicate records that inflated results on the older KDD Cup 99 data and has 41 features per
+connection and four attack families (DoS, Probe, R2L, U2R). CICIoT2023 \citep{neto2023} is a newer
+data set recorded on a real IoT network, with many attack types and flow-level features. Both are
+strongly imbalanced: some attack classes are rare, so accuracy alone is misleading.
+
+\subsection{Support vector machines and kernels}
+An SVM \citep{cortes1995} learns a maximum-margin separator. In its dual form it only needs the
+kernel $k(x,x')$ between pairs of training points:
+\begin{equation}
+  \max_{\alpha}\ \sum_i\alpha_i-\frac12\sum_{i,j}\alpha_i\alpha_jy_iy_j\,k(x_i,x_j)
+  \quad\text{s.t.}\quad 0\le\alpha_i\le C,\ \ \sum_i\alpha_iy_i=0,
+\end{equation}
+and predicts $f(x)=\operatorname{sign}\big(\sum_i\alpha_iy_ik(x_i,x)+b\big)$. Any positive
+semi-definite similarity can be plugged in, including one computed by a quantum circuit.
+
+\subsection{The quantum kernel}
+The ZZ feature map of \citet{havlicek2019} encodes $x\in\R^d$ on $d$ qubits with Hadamards and
+phases that depend on single features and on pairwise products. The kernel is the fidelity of two
+encoded states,
+\begin{equation}
+  \kappa(x,x')=|\braket{\psi(x)|\psi(x')}|^2=|\braket{0|U_\Phi(x')^\dagger U_\Phi(x)|0}|^2,
+\end{equation}
+estimated on hardware as the probability of measuring all zeros after running
+$U_\Phi(x')^\dagger U_\Phi(x)$. Building the Gram matrix needs $O(N^2)$ circuit evaluations for
+$N$ training points, which limits training sets to a few thousand points.
+
+\subsection{Bandwidth and concentration}
+Before encoding, features are scaled as $x\mapsto\lambda x$. For large $\lambda$ the encoded states
+are almost orthogonal, the Gram matrix approaches the identity and the model memorises the training
+set; this is exponential concentration \citep{thanasilp2024}. \citet{shaydulin2022} showed that
+reducing the bandwidth $\lambda$ restores generalisation, in the same way as the width of an RBF
+kernel. \citet{huang2021power} give a test for whether a quantum kernel can beat classical ones at
+all on given data: the \emph{geometric difference}
+\begin{equation}
+  g(K^{C}\Vert K^{Q})=\sqrt{\big\lVert\sqrt{K^{Q}}\,(K^{C})^{-1}\sqrt{K^{Q}}\big\rVert_\infty},
+\end{equation}
+which must be large for a quantum advantage to be possible.
+
+% ===========================================================================
+\section{Research questions}
+% ===========================================================================
+The project is open-ended: these questions are the starting point, not the finish line. Add new
+ones to the README and the journal as they come up.
+
+\begin{rqlist}
+  \item At the best bandwidth, does the quantum-kernel SVM beat a tuned RBF-SVM and a small MLP on binary detection with the same 4--8 features?
+  \item Does the quantum kernel help on rare attack classes (per-class recall), or only on the easy majority classes?
+  \item How do accuracy, kernel concentration and the geometric difference change with bandwidth $\lambda$ and qubit number $d$?
+\end{rqlist}
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+\subsection{Data}
+NSL-KDD first (KDDTrain+ for training, KDDTest+ for testing), then CICIoT2023. Categorical
+features are one-hot encoded, all features standardised, and PCA reduces them to $d\in\{4,6,8\}$
+components, scaled to $[0,\pi]$ and then multiplied by $\lambda$. Because the Gram matrix costs
+$O(N^2)$ circuit runs, training uses stratified subsamples of $N=250$ to $2000$ connections; the
+test set keeps its original class balance.
+
+\subsection{Models}
+Fidelity kernel with the ZZ feature map (\texttt{reps} 1--2), simulated exactly with state vectors;
+the precomputed Gram matrix goes into \texttt{sklearn.svm.SVC} \citep{pedregosa2011} with $C$
+chosen by cross-validation. Multi-class detection uses one-vs-rest.
+
+\subsection{Baselines}
+RBF-SVM with $(C,\gamma)$ tuned on the same features; logistic regression; an MLP with a similar
+number of parameters; and, as a sanity check, the quantum kernel with $\lambda\to0$, which
+approaches a constant kernel.
+
+\subsection{Metrics}
+\begin{itemize}
+  \item Accuracy, macro-F1, attack recall and false-positive rate; ROC-AUC for the binary task.
+  \item Per-class recall for the four NSL-KDD attack families.
+  \item Kernel diagnostics: off-diagonal variance, kernel--target alignment and geometric difference $g$.
+  \item Cost: number of circuit evaluations and wall-clock time.
+\end{itemize}
+
+% ===========================================================================
+\section{Planned experiments}
+% ===========================================================================
+Each experiment becomes one \texttt{[[experiments]]} entry in the workspace, so its runs, parameters
+and metrics are stored and compared in the portal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright}X>{\raggedright}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Experiment & What varies & Main metrics \\
+\midrule
+  E1 & Binary detection, $d=4$ & bandwidth $\lambda\in\{0.05,\dots,1\}$ & macro-F1, off-diagonal variance \\
+  E2 & Qubit scaling & $d\in\{4,6,8\}$ at the best $\lambda$ & macro-F1, $g$, run time \\
+  E3 & Attack families & one-vs-rest over DoS, Probe, R2L, U2R & per-class recall \\
+  E4 & Learning curves & $N\in\{250,500,1000,2000\}$ & test macro-F1 vs RBF \\
+  E5 & Shot noise & kernel entries from $M$ shots & accuracy loss vs exact kernel \\
+\bottomrule
+\end{tabularx}
+\caption{Experiment plan. Results go into the journal and the results log (\cref{sec:log}).}
+\end{table}
+
+% ===========================================================================
+\section{Running it in the QML Lab}
+% ===========================================================================
+The workspace lives in \path{qml_projects/quantum-kernel-intrusion-detection/}. Scripts import three helpers from
+\path{qml_lab/plots.py}:
+\begin{itemize}
+  \item \texttt{params()} reads the parameters from the portal's run form (defaults when run by hand);
+  \item \texttt{save()} stores figures with the run;
+  \item \texttt{log\_metrics()} records numbers that appear in the run table.
+\end{itemize}
+
+\begin{lstlisting}
+qml_projects/quantum-kernel-intrusion-detection/
+  project.toml          metadata + experiments
+  README.md             goal, open questions, ideas
+  experiments/          runnable scripts
+  docs/main.tex         this document
+\end{lstlisting}
+
+First experiment: This experiment is \emph{planned}: write the script, add the block below to \texttt{project.toml}, then run \texttt{python manage.py sync\_projects}.
+
+\begin{lstlisting}[language={}]
+[[experiments]]
+slug = "nsl-kdd-binary"
+title = "Binary NSL-KDD detection with a ZZ quantum kernel"
+script = "experiments/e01_nsl_kdd_binary.py"
+figure = "kernel_vs_rbf.png"
+
+[experiments.params]
+n_features = 4
+bandwidth = 0.5
+reps = 2
+n_train = 1000
+seed = 0
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# from the portal folder: pick up changes to project.toml
+python manage.py sync_projects
+cd qml_projects/quantum-kernel-intrusion-detection
+# run by hand with the default parameters
+PYTHONPATH=../../qml_lab python experiments/e01_nsl_kdd_binary.py
+\end{lstlisting}
+
+% ===========================================================================
+\section{Quality bar}
+% ===========================================================================
+\begin{itemize}
+  \item A classical baseline with a similar number of trainable parameters, tuned with the same care \citep{bowles2024}.
+  \item At least five random seeds per configuration, reported as mean $\pm$ standard deviation.
+  \item How results change with the number of qubits.
+  \item At least one run under a realistic noise model.
+  \item Report per-class recall and false-positive rate, not accuracy alone; the data is imbalanced.
+\end{itemize}
+
+% ===========================================================================
+\section{Open directions}
+% ===========================================================================
+\begin{itemize}
+  \item Move from NSL-KDD to CICIoT2023 and compare how conclusions change on recent IoT traffic.
+  \item One-class SVM with the quantum kernel for anomaly detection when attack labels are missing.
+  \item Compare inference cost and accuracy with a TinyML-sized classical detector running on an edge device.
+  \item Projected quantum kernels (Project 03) as a less concentrated alternative.
+\end{itemize}
+
+% ===========================================================================
+\section{Risks and limitations}
+% ===========================================================================
+\begin{itemize}
+  \item $O(N^2)$ kernel evaluations limit training-set size; subsampling may favour simpler models.
+  \item PCA to 4--8 components can discard the signal of rare attacks; check what the baselines lose too.
+  \item NSL-KDD has known artefacts and is old; treat it as a benchmark, not as evidence of real-world performance.
+  \item Large bandwidth or many qubits leads to concentrated, memorising kernels.
+\end{itemize}
+
+% ===========================================================================
+\section{Results log}
+\label{sec:log}
+% ===========================================================================
+Summarise findings here as they become stable; day-to-day notes belong in the portal journal.
+
+\begin{table}[h]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright}X >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Run & Finding & Next step \\
+\midrule
+ & & & \\
+ & & & \\
+ & & & \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\bibliographystyle{harvardqml}
+\bibliography{references}
+
+\end{document}
